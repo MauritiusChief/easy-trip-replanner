@@ -5,6 +5,7 @@ import { addMinutes } from './time'
 import type {
   AlternativePlace,
   DateISO,
+  DayPlan,
   EpochMs,
   Leg,
   PlaceSlot,
@@ -44,6 +45,18 @@ function mapDay(trip: Trip, dayKey: DateISO, mapLegs: (legs: Leg[]) => Leg[]): T
   }
 }
 
+/** 对某一天的 DayPlan（含备选库）做不可变映射，其余日期保持引用不变。 */
+function mapDayFull(
+  trip: Trip,
+  dayKey: DateISO,
+  edit: (day: DayPlan) => DayPlan,
+): Trip {
+  return {
+    ...trip,
+    days: trip.days.map((day) => (day.date === dayKey ? edit(day) : day)),
+  }
+}
+
 /**
  * 用户手动修改交通时长后的交通 slot：
  * 时长取新值，基准速度按"当前距离 + 新时长"重算（需求 4.4）。
@@ -63,7 +76,7 @@ function transportWithDuration(
 
 /**
  * 保存地点编辑：
- * - 更新地点字段与备选地点
+ * - 更新地点字段（备选地点在日级库单独编辑，见 withAlternativeSaved）
  * - 同步坐标快照：自身交通的 to、下一段交通的 from 指向新坐标
  *   （时长与基准速度不动，坐标变化导致的速度偏差由警告层提示）
  */
@@ -72,7 +85,6 @@ export function withPlaceSaved(
   dayKey: DateISO,
   legIndex: number,
   place: PlaceSlot,
-  alternatives: AlternativePlace[],
 ): Trip {
   return mapDay(trip, dayKey, (legs) =>
     legs.map((leg, i) => {
@@ -80,7 +92,6 @@ export function withPlaceSaved(
         return {
           ...leg,
           place,
-          alternatives,
           transport: leg.transport
             ? { ...leg.transport, to: place.location }
             : null,
@@ -163,7 +174,6 @@ export function withPlaceInserted(
       maxStayMinutes: null,
       fixedStart: null,
     },
-    alternatives: [],
   }
   return mapDay(trip, dayKey, (current) => {
     const next = [...current]
@@ -184,38 +194,86 @@ export function withPlaceInserted(
  * 删除地点：
  * - 移除该段；若删除的是首段，新首段的交通置空（没有前序地点）
  * - 其余各段的 from 快照顺延为新的前序地点坐标（时长与基准不变）
+ * - 备选库中链接到该地点的条目保留，linkedPlaceId 置 null（"未连接"）
  */
 export function withPlaceDeleted(
   trip: Trip,
   dayKey: DateISO,
   legIndex: number,
 ): Trip {
-  return mapDay(trip, dayKey, (legs) => {
-    if (legIndex < 0 || legIndex >= legs.length) return legs
-    const next = legs.filter((_, i) => i !== legIndex)
-    if (next.length > 0 && next[0].transport) {
-      next[0] = { ...next[0], transport: null }
+  return mapDayFull(trip, dayKey, (day) => {
+    if (legIndex < 0 || legIndex >= day.legs.length) return day
+    const removedId = day.legs[legIndex].place.id
+    const legs = day.legs.filter((_, i) => i !== legIndex)
+    if (legs.length > 0 && legs[0].transport) {
+      legs[0] = { ...legs[0], transport: null }
     }
-    for (let i = 1; i < next.length; i++) {
-      const leg = next[i]
+    for (let i = 1; i < legs.length; i++) {
+      const leg = legs[i]
       if (leg.transport) {
-        next[i] = {
+        legs[i] = {
           ...leg,
-          transport: { ...leg.transport, from: next[i - 1].place.location },
+          transport: { ...leg.transport, from: legs[i - 1].place.location },
         }
       }
     }
-    return next
+    const alternatives = day.alternatives.map((alternative) =>
+      alternative.linkedPlaceId === removedId
+        ? { ...alternative, linkedPlaceId: null }
+        : alternative,
+    )
+    return { ...day, legs, alternatives }
   })
 }
 
 /**
- * 采纳重排草案：用草案段落替换目标日期 fromLegIndex 之后的行程。
- * 草案由 replan 引擎生成，前缀保持原引用不变（需求 1.2：最终由用户决定）。
+ * 保存备选地点（需求 7）：按 id upsert，新条目追加到库末尾。
+ * linkedPlaceId 允许 null（未连接）或指向当日任意计划地点。
+ */
+export function withAlternativeSaved(
+  trip: Trip,
+  dayKey: DateISO,
+  alternative: AlternativePlace,
+): Trip {
+  return mapDayFull(trip, dayKey, (day) => ({
+    ...day,
+    alternatives: day.alternatives.some((entry) => entry.id === alternative.id)
+      ? day.alternatives.map((entry) =>
+          entry.id === alternative.id ? alternative : entry,
+        )
+      : [...day.alternatives, alternative],
+  }))
+}
+
+/** 删除备选库条目。 */
+export function withAlternativeDeleted(
+  trip: Trip,
+  dayKey: DateISO,
+  altId: string,
+): Trip {
+  return mapDayFull(trip, dayKey, (day) => ({
+    ...day,
+    alternatives: day.alternatives.filter((entry) => entry.id !== altId),
+  }))
+}
+
+/**
+ * 采纳重排草案：用草案段落替换目标日期 fromLegIndex 之后的行程，
+ * 并同步备选库（需求 7）：
+ * - 换入计划的备选 → 对应库条目移除（它已成为计划地点）
+ * - 链接目标被取消（不在新行程中）的条目 → linkedPlaceId 置 null（未连接）
  */
 export function withDraftAdopted(trip: Trip, draft: ReplanDraft): Trip {
-  return mapDay(trip, draft.day, (legs) => [
-    ...legs.slice(0, draft.fromLegIndex),
-    ...draft.legs,
-  ])
+  return mapDayFull(trip, draft.day, (day) => {
+    const legs = [...day.legs.slice(0, draft.fromLegIndex), ...draft.legs]
+    const placeIds = new Set(legs.map((leg) => leg.place.id))
+    const alternatives = day.alternatives
+      .filter((entry) => !placeIds.has(entry.id))
+      .map((entry) =>
+        entry.linkedPlaceId !== null && !placeIds.has(entry.linkedPlaceId)
+          ? { ...entry, linkedPlaceId: null }
+          : entry,
+      )
+    return { ...day, legs, alternatives }
+  })
 }

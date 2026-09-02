@@ -41,10 +41,8 @@ import type {
  * 有限排列搜索留待阶段 5 调参时评估收益。
  */
 
-/** 新交通没有用户基准时的默认时长；备选地点/新插入地点同源。 */
+/** 新交通没有用户基准时的默认时长；备选地点换入时同源（需求 4.4 由用户事后调整）。 */
 const DEFAULT_TRANSPORT_MINUTES = 30
-/** 备选地点没有既定停留时的默认时长。 */
-const DEFAULT_STAY_MINUTES = 60
 
 /** 引擎内部的排程候选：来自原计划地点或其备选。 */
 interface Candidate {
@@ -65,10 +63,8 @@ interface Candidate {
   /** 用户为该段设定的交通时长基准（需求 4.4：只沿用，不反推）。 */
   transportDuration: number
   transportBaseSpeed: number | null
-  /** 启用备选时的替代候选（按优先级升序）。 */
+  /** 启用备选时，日级库中链接到本地点的替代候选（按优先级升序）。 */
   alternatives: AlternativePlace[]
-  /** 原地点携带的备选列表，保留到草案段落上。 */
-  originalAlternatives: AlternativePlace[]
 }
 
 /** 一次成功排入的结果。 */
@@ -114,12 +110,10 @@ function candidateFromLeg(leg: Leg): Candidate {
       : DEFAULT_TRANSPORT_MINUTES,
     transportBaseSpeed: leg.transport ? leg.transport.baseSpeedKmh : null,
     alternatives: [],
-    originalAlternatives: leg.alternatives,
   }
 }
 
 function candidateFromAlternative(alt: AlternativePlace, base: Candidate): Candidate {
-  const stay = alt.minStayMinutes ?? DEFAULT_STAY_MINUTES
   return {
     id: alt.id,
     basePlaceId: base.basePlaceId,
@@ -131,12 +125,11 @@ function candidateFromAlternative(alt: AlternativePlace, base: Candidate): Candi
     minStay: alt.minStayMinutes,
     maxStay: alt.maxStayMinutes,
     fixedStart: null,
-    currentDuration:
-      alt.maxStayMinutes !== null ? Math.min(stay, alt.maxStayMinutes) : stay,
+    // 备选自己的计划停留时长（属性独立）；交通时长沿用默认值
+    currentDuration: alt.durationMinutes,
     transportDuration: DEFAULT_TRANSPORT_MINUTES,
     transportBaseSpeed: null,
     alternatives: [],
-    originalAlternatives: base.originalAlternatives,
   }
 }
 
@@ -297,12 +290,19 @@ export function buildReplanDraft(
   const infeasibleReasons: string[] = []
   const cancelledPlaceIds: PlaceId[] = []
 
-  // 候选 = 剩余地点；启用备选时附带其替代列表（需求 7.3）
+  // 候选 = 剩余地点；启用备选时从日级备选库取"链接命中重排区间地点"的
+  // 条目挂到对应候选上（需求 7.2/7.3：平时不参与，链接到锁定前缀的不参与）
   const candidates = regionLegs.map(candidateFromLeg)
   if (includeAlternatives) {
+    const regionIds = new Set(regionLegs.map((leg) => leg.place.id))
+    const library = day.alternatives
+      .filter(
+        (entry) => entry.linkedPlaceId !== null && regionIds.has(entry.linkedPlaceId),
+      )
+      .sort((a, b) => a.priority - b.priority)
     for (const candidate of candidates) {
-      candidate.alternatives = [...candidate.originalAlternatives].sort(
-        (a, b) => a.priority - b.priority,
+      candidate.alternatives = library.filter(
+        (entry) => entry.linkedPlaceId === candidate.id,
       )
     }
   }
@@ -451,14 +451,14 @@ export function buildReplanDraft(
       maxStayMinutes: candidate.maxStay,
       fixedStart: candidate.fixedStart,
     }
-    draftLegs.push({ transport, place, alternatives: candidate.originalAlternatives })
+    draftLegs.push({ transport, place })
     hasPredecessor = true
     cursorLocation = candidate.location
   }
 
   // 通用警告复查：速度异常（前序变化后隐含速度 vs 基准）、绕路、重叠等
   const fullLegs = [...prefixLegs, ...draftLegs]
-  const genericWarnings = collectDayWarnings(trip, { date: dayKey, legs: fullLegs })
+  const genericWarnings = collectDayWarnings(trip, { ...day, legs: fullLegs })
 
   return {
     day: dayKey,

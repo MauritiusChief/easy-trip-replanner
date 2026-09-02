@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { TIME_STEP_MINUTES } from '../../domain/config'
-import { findLeg } from '../../domain/current'
+import { findAlternative } from '../../domain/current'
 import {
-  dayKeyToUtcEpoch,
   formatMinuteOfDay,
-  getZonedMinuteOfDay,
   roundMinutesToStep,
 } from '../../domain/time'
-import type { DateISO, MinuteOfDay, PlaceSlot } from '../../domain/types'
+import type {
+  AlternativePlace,
+  DateISO,
+  MinuteOfDay,
+  PlaceId,
+} from '../../domain/types'
 import { useTripStore } from '../../state/tripStore'
 import {
   parseCoordinate,
@@ -15,62 +18,81 @@ import {
   parsePriority,
   parseTimeInput,
 } from './formUtils'
+import { SearchSelect } from './SearchSelect'
 
-interface PlaceEditorProps {
+interface AlternativeEditorProps {
   dayKey: DateISO
-  legIndex: number
+  /** null 表示新建条目，否则编辑库中对应 id 的条目。 */
+  altId: PlaceId | null
 }
 
 /**
- * 地点编辑表单（需求 8.2 表单式精确修改）：
- * 名称、坐标、开始时间（旅行时区 HH:mm）、停留时长、开放时间、
- * 停留上下限、优先级、固定开始。
- * 备选地点不在此编辑：它们位于日级备选地点库（需求 7，见 AlternativeEditor）。
+ * 备选地点编辑表单（需求 7：日级备选地点库）。
+ * 备选条目属性完全独立：名称、坐标、计划停留时长、开放时间、
+ * 停留上下限、优先级、固定开始，以及到当日计划地点的链接（可为未连接）。
  * 表单值为组件本地状态，仅"保存"时写入 store。
  */
-export function PlaceEditor({ dayKey, legIndex }: PlaceEditorProps) {
+export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
   const trip = useTripStore((state) => state.trip)
-  const savePlaceEdit = useTripStore((state) => state.savePlaceEdit)
-  const insertPlace = useTripStore((state) => state.insertPlace)
-  const deletePlace = useTripStore((state) => state.deletePlace)
+  const saveAlternative = useTripStore((state) => state.saveAlternative)
+  const deleteAlternative = useTripStore((state) => state.deleteAlternative)
   const closeEditor = useTripStore((state) => state.closeEditor)
 
-  const leg = findLeg(trip, dayKey, legIndex)
-  const place = leg?.place
+  const existing = altId !== null ? findAlternative(trip, dayKey, altId) : undefined
+  const day = trip.days.find((entry) => entry.date === dayKey)
   const timeZone = trip.timezone
 
-  const [name, setName] = useState(place?.name ?? '')
-  const [lat, setLat] = useState(place ? String(place.location.lat) : '0')
-  const [lng, setLng] = useState(place ? String(place.location.lng) : '0')
-  const [startValue, setStartValue] = useState(() =>
-    place ? formatMinuteOfDay(getZonedMinuteOfDay(place.start, timeZone)) : '09:00',
+  const [name, setName] = useState(existing?.name ?? '')
+  const [lat, setLat] = useState(
+    existing ? String(existing.location.lat) : '0',
   )
-  const [duration, setDuration] = useState(place ? String(place.durationMinutes) : '60')
+  const [lng, setLng] = useState(
+    existing ? String(existing.location.lng) : '0',
+  )
+  const [duration, setDuration] = useState(
+    existing ? String(existing.durationMinutes) : '60',
+  )
   const [openValue, setOpenValue] = useState(
-    place?.open != null ? formatMinuteOfDay(place.open) : '',
+    existing?.open != null ? formatMinuteOfDay(existing.open) : '',
   )
   const [closeValue, setCloseValue] = useState(
-    place?.close != null ? formatMinuteOfDay(place.close) : '',
+    existing?.close != null ? formatMinuteOfDay(existing.close) : '',
   )
   const [minStay, setMinStay] = useState(
-    place?.minStayMinutes != null ? String(place.minStayMinutes) : '',
+    existing?.minStayMinutes != null ? String(existing.minStayMinutes) : '',
   )
   const [maxStay, setMaxStay] = useState(
-    place?.maxStayMinutes != null ? String(place.maxStayMinutes) : '',
+    existing?.maxStayMinutes != null ? String(existing.maxStayMinutes) : '',
   )
-  const [priority, setPriority] = useState(place ? String(place.priority) : '5')
-  const fixedEnabledInitial = place?.fixedStart != null
-  const [fixedEnabled, setFixedEnabled] = useState(fixedEnabledInitial)
+  const [priority, setPriority] = useState(
+    existing ? String(existing.priority) : '5',
+  )
+  const [fixedEnabled, setFixedEnabled] = useState(existing?.fixedStart != null)
   const [fixedValue, setFixedValue] = useState(
-    place?.fixedStart != null ? formatMinuteOfDay(place.fixedStart) : '',
+    existing?.fixedStart != null ? formatMinuteOfDay(existing.fixedStart) : '',
   )
+  const [linkedId, setLinkedId] = useState(existing?.linkedPlaceId ?? '')
   const [error, setError] = useState<string | null>(null)
 
-  if (!place) return null
+  if (!day) return null
 
-  /** 解析并校验全部字段，失败时返回错误文案；成功返回可提交的数据。 */
+  /**
+   * 切换链接地点时，新建态且坐标仍是默认值的情况下，
+   * 用链接目标的坐标预填（备选通常在原地点附近，减少手输成本）。
+   */
+  const handleLinkChange = (nextId: string) => {
+    setLinkedId(nextId)
+    if (altId === null && lat.trim() === '0' && lng.trim() === '0') {
+      const target = day.legs.find((leg) => leg.place.id === nextId)?.place
+      if (target) {
+        setLat(String(target.location.lat))
+        setLng(String(target.location.lng))
+      }
+    }
+  }
+
   const buildResult = ():
-    | { ok: true; place: PlaceSlot }
+    | { ok: true; alternative: AlternativePlace }
     | { ok: false; message: string } => {
     const trimmedName = name.trim()
     if (trimmedName === '') return { ok: false, message: '名称不能为空' }
@@ -78,11 +100,9 @@ export function PlaceEditor({ dayKey, legIndex }: PlaceEditorProps) {
     if (parsedLat === undefined) return { ok: false, message: '纬度需在 -90 到 90 之间' }
     const parsedLng = parseCoordinate(lng, -180, 180)
     if (parsedLng === undefined) return { ok: false, message: '经度需在 -180 到 180 之间' }
-    const startMinute = parseTimeInput(startValue)
-    if (startMinute === null) return { ok: false, message: '开始时间格式应为 HH:mm' }
     const parsedDuration = parseOptionalMinutes(duration)
     if (parsedDuration === undefined || parsedDuration === null) {
-      return { ok: false, message: '停留时长必须为正数分钟' }
+      return { ok: false, message: '计划停留时长必须为正数分钟' }
     }
     const parsedOpen = parseTimeInput(openValue)
     if (openValue.trim() !== '' && parsedOpen === null) {
@@ -113,24 +133,23 @@ export function PlaceEditor({ dayKey, legIndex }: PlaceEditorProps) {
       parsedFixed = parseTimeInput(fixedValue)
       if (parsedFixed === null) return { ok: false, message: '固定开始时间格式应为 HH:mm' }
     }
-    const durationMinutes = Math.max(
-      TIME_STEP_MINUTES,
-      roundMinutesToStep(parsedDuration),
-    )
     return {
       ok: true,
-      place: {
-        id: place.id,
+      alternative: {
+        id: existing?.id ?? `alt-${Date.now().toString(36)}`,
         name: trimmedName,
         location: { lat: parsedLat, lng: parsedLng },
         priority: parsedPriority,
-        start: dayKeyToUtcEpoch(dayKey, roundMinutesToStep(startMinute), timeZone),
-        durationMinutes,
+        durationMinutes: Math.max(
+          TIME_STEP_MINUTES,
+          roundMinutesToStep(parsedDuration),
+        ),
         open: parsedOpen,
         close: parsedClose,
         minStayMinutes: parsedMinStay === null ? null : roundMinutesToStep(parsedMinStay),
         maxStayMinutes: parsedMaxStay === null ? null : roundMinutesToStep(parsedMaxStay),
         fixedStart: parsedFixed,
+        linkedPlaceId: linkedId === '' ? null : linkedId,
       },
     }
   }
@@ -141,12 +160,12 @@ export function PlaceEditor({ dayKey, legIndex }: PlaceEditorProps) {
       setError(result.message)
       return
     }
-    savePlaceEdit(dayKey, legIndex, result.place)
+    saveAlternative(dayKey, result.alternative)
   }
 
   const handleDelete = () => {
-    if (window.confirm(`删除「${place.name}」？该操作直接修改计划。`)) {
-      deletePlace(dayKey, legIndex)
+    if (existing && window.confirm(`删除备选「${existing.name}」？`)) {
+      deleteAlternative(dayKey, existing.id)
     }
   }
 
@@ -176,20 +195,19 @@ export function PlaceEditor({ dayKey, legIndex }: PlaceEditorProps) {
       </div>
       <div className="field-grid">
         <label className="field">
-          <span>开始时间（{timeZone}）</span>
-          <input
-            type="time"
-            step={TIME_STEP_MINUTES * 60}
-            value={startValue}
-            onChange={(event) => setStartValue(event.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>停留时长（分钟）</span>
+          <span>计划停留时长（分钟）</span>
           <input
             value={duration}
             inputMode="numeric"
             onChange={(event) => setDuration(event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span>优先级（1 最高）</span>
+          <input
+            value={priority}
+            inputMode="numeric"
+            onChange={(event) => setPriority(event.target.value)}
           />
         </label>
       </div>
@@ -229,14 +247,6 @@ export function PlaceEditor({ dayKey, legIndex }: PlaceEditorProps) {
           />
         </label>
       </div>
-      <label className="field">
-        <span>优先级（1 最高）</span>
-        <input
-          value={priority}
-          inputMode="numeric"
-          onChange={(event) => setPriority(event.target.value)}
-        />
-      </label>
       <div className="field-row">
         <label className="field-check">
           <input
@@ -255,6 +265,22 @@ export function PlaceEditor({ dayKey, legIndex }: PlaceEditorProps) {
           />
         )}
       </div>
+      <div className="field">
+        <span>链接的计划地点（备用于）</span>
+        <SearchSelect
+          ariaLabel="链接的计划地点"
+          value={linkedId}
+          placeholder="输入筛选或浏览全部地点"
+          options={[
+            { value: '', label: '未连接' },
+            ...day.legs.map((leg) => ({
+              value: leg.place.id,
+              label: leg.place.name,
+            })),
+          ]}
+          onChange={handleLinkChange}
+        />
+      </div>
       {error !== null && (
         <p className="sheet-error" role="alert">
           {error}
@@ -267,13 +293,15 @@ export function PlaceEditor({ dayKey, legIndex }: PlaceEditorProps) {
         <button type="button" className="btn" onClick={closeEditor}>
           取消
         </button>
-        <button type="button" className="btn" onClick={() => insertPlace(dayKey, legIndex)}>
-          在此后插入
-        </button>
-        <button type="button" className="btn btn-danger" onClick={handleDelete}>
-          删除地点
-        </button>
+        {existing && (
+          <button type="button" className="btn btn-danger" onClick={handleDelete}>
+            删除备选
+          </button>
+        )}
       </div>
+      <p className="sheet-hint">
+        时区：{timeZone}；备选不参与时间轴，仅在重排并勾选"纳入备选地点"时作为替代候选
+      </p>
     </div>
   )
 }

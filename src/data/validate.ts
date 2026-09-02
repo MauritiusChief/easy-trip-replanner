@@ -102,11 +102,6 @@ function validatePlaceSlot(value: unknown): PlaceSlot | null {
   return { ...base, start: value.start, durationMinutes: value.durationMinutes }
 }
 
-/** 备选地点与地点同构，只是没有日程字段。 */
-function validateAlternative(value: unknown): AlternativePlace | null {
-  return validatePlaceBase(value)
-}
-
 function validateTransport(value: unknown): TransportSlot | null {
   if (!isRecord(value)) return null
   if (typeof value.start !== 'number' || !Number.isFinite(value.start)) return null
@@ -134,16 +129,26 @@ function validateLeg(value: unknown): Leg | null {
     transport = validateTransport(value.transport)
     if (!transport) return null
   }
-  const alternatives: AlternativePlace[] = []
-  if (value.alternatives !== null && value.alternatives !== undefined) {
-    if (!Array.isArray(value.alternatives)) return null
-    for (const raw of value.alternatives) {
-      const alternative = validateAlternative(raw)
-      if (!alternative) return null
-      alternatives.push(alternative)
+  return { transport, place }
+}
+
+/**
+ * 备选地点（日级库条目）：地点基础字段 + 独立的计划停留时长 + 链接字段。
+ * linkedPlaceId 允许 null（未连接）或任意非空字符串（允许悬空，
+ * 悬空条目在界面显示为"未连接"，不做跨引用拒绝）。
+ */
+function validateAlternative(value: unknown): AlternativePlace | null {
+  const base = validatePlaceBase(value)
+  if (!base || !isRecord(value)) return null
+  if (!isPositiveNumber(value.durationMinutes)) return null
+  let linkedPlaceId: string | null = null
+  if (value.linkedPlaceId !== undefined && value.linkedPlaceId !== null) {
+    if (typeof value.linkedPlaceId !== 'string' || value.linkedPlaceId.length === 0) {
+      return null
     }
+    linkedPlaceId = value.linkedPlaceId
   }
-  return { transport, place, alternatives }
+  return { ...base, durationMinutes: value.durationMinutes, linkedPlaceId }
 }
 
 function validateDay(value: unknown): DayPlan | null {
@@ -156,7 +161,16 @@ function validateDay(value: unknown): DayPlan | null {
     if (!leg) return null
     legs.push(leg)
   }
-  return { date: value.date, legs }
+  const alternatives: AlternativePlace[] = []
+  if (value.alternatives !== null && value.alternatives !== undefined) {
+    if (!Array.isArray(value.alternatives)) return null
+    for (const raw of value.alternatives) {
+      const alternative = validateAlternative(raw)
+      if (!alternative) return null
+      alternatives.push(alternative)
+    }
+  }
+  return { date: value.date, legs, alternatives }
 }
 
 /** 未知结构的 dayOverrides：只收集合法条目，其余静默丢弃（覆盖缺失会回落到统一窗口）。 */

@@ -54,11 +54,37 @@ export interface PlaceSlot {
 }
 
 /**
- * 备选地点（需求 7）：原计划出问题时的条件性候选资源。
- * 与 PlaceSlot 的区别是不携带日程（start/durationMinutes），
- * 平时不参与时间轴，只在用户主动启用时进入重排候选集。
+ * 备选地点（需求 7）：日级"备选地点库"的条目，属性完全独立。
+ *
+ * 与 PlaceSlot 的区别：
+ * - 没有 start（不排入时间轴，平时不参与计划）
+ * - durationMinutes 是备选自己的"计划停留时长"，换入计划时直接沿用
+ * - 交通时长不在此设置，换入时由引擎使用默认值（需求 4.4：时长由用户事后调整）
+ *
+ * linkedPlaceId 指向同日计划中的某个地点，表达"为它准备的替代"；
+ * 该地点被删除/取消后条目保留，linkedPlaceId 置 null（"未连接"），
+ * 可在编辑器重新绑定；未连接条目不参与重排替换。
  */
-export type AlternativePlace = Omit<PlaceSlot, 'start' | 'durationMinutes'>
+export interface AlternativePlace {
+  id: PlaceId
+  name: string
+  location: GeoPoint
+  /** 每日优先级，数字越小优先级越高（1 = 最高）。 */
+  priority: number
+  /** 计划停留时长（分钟），5 分钟粒度；换入计划时作为初始停留。 */
+  durationMinutes: number
+  /** 开放开始时刻（旅行时区当日分钟），null 表示不约束或未知。 */
+  open: MinuteOfDay | null
+  /** 开放结束时刻（旅行时区当日分钟），null 表示不约束或未知。 */
+  close: MinuteOfDay | null
+  /** 最短停留：null 表示可取消（需求 3.1）。 */
+  minStayMinutes: number | null
+  /** 最长停留：null 表示无上限。 */
+  maxStayMinutes: number | null
+  fixedStart: MinuteOfDay | null
+  /** 链接的计划地点 id；null 表示未连接。 */
+  linkedPlaceId: PlaceId | null
+}
 
 /**
  * 交通 slot（需求 4）：依附于目的地的一段移动。
@@ -81,12 +107,11 @@ export interface TransportSlot {
  * 时间轴最小单元：一段"到达交通 + 地点停留"。
  * 交通依附目的地（需求 4.2），因此与 place 成对出现；
  * 当天第一段行程没有前序地点，transport 为 null。
+ * 备选地点不在 Leg 上：它们存放在日级备选地点库（DayPlan.alternatives）。
  */
 export interface Leg {
   transport: TransportSlot | null
   place: PlaceSlot
-  /** 该地点关联的备选地点，平时不排入时间轴。 */
-  alternatives: AlternativePlace[]
 }
 
 /** 单个日历日的计划。不同日期之间不做联合优化（需求 2.2）。 */
@@ -94,6 +119,8 @@ export interface DayPlan {
   date: DateISO
   /** 按时间顺序排列的行程段。 */
   legs: Leg[]
+  /** 日级备选地点库（需求 7）：平时不排入时间轴，重排时按链接参与替换。 */
+  alternatives: AlternativePlace[]
 }
 
 /** 单日窗口覆盖项：不设置的字段回落到旅行级的 dailyStart/dailyEnd。 */
@@ -107,7 +134,7 @@ export interface DayWindowOverride {
  * 这是应用的唯一主要状态，不维护任何现实执行状态（需求 9.3）。
  */
 export interface Trip {
-  schemaVersion: 1
+  schemaVersion: 2
   name: string
   /** IANA 时区名（如 Asia/Tokyo），旅行开始前设定，内部时间均按它换算。 */
   timezone: string
@@ -156,6 +183,7 @@ export interface PlanWarning {
 
 /**
  * 重排草案（阶段 3 产物）：只替换目标日期 fromLegIndex 之后的行程，
+ * 并同步该日备选库（换入条目移除、悬空链接置空），
  * 在用户确认前绝不写入正式计划（需求 1.2）。
  */
 export interface ReplanDraft {

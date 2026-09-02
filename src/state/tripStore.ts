@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { loadTrip, saveTrip } from '../data/storage'
 import {
+  withAlternativeDeleted,
+  withAlternativeSaved,
   withDraftAdopted,
   withPlaceDeleted,
   withPlaceInserted,
@@ -12,23 +14,25 @@ import type {
   AlternativePlace,
   DateISO,
   EpochMs,
+  PlaceId,
   PlaceSlot,
   ReplanDraft,
   Trip,
 } from '../domain/types'
 
 /**
- * 全局状态（阶段 2 引入 zustand，阶段 3 扩展重排草案）：
+ * 全局状态（阶段 2 引入 zustand，阶段 3 扩展重排草案与备选库）：
  * - trip：唯一主要状态，任何变更经 mutations 纯函数生成新引用并自动持久化
  * - editor：当前打开的编辑器（临时 UI 状态，不持久化）
  * - draft：重排引擎产出的草案（临时状态，未采纳绝不写入 trip，不持久化）
  * - resetReason / saveFailed：数据加载与持久化的用户提示
  */
 
-/** 编辑器目标：某天的某个地点或交通段。 */
+/** 编辑器目标：某天的某个地点/交通段，或备选库条目（altId 为 null 表示新建）。 */
 export type EditorSelection =
   | { type: 'place'; dayKey: DateISO; legIndex: number }
   | { type: 'transport'; dayKey: DateISO; legIndex: number }
+  | { type: 'alternative'; dayKey: DateISO; altId: PlaceId | null }
 
 export interface TripStore {
   trip: Trip
@@ -38,19 +42,18 @@ export interface TripStore {
   draft: ReplanDraft | null
   openEditor: (selection: EditorSelection) => void
   closeEditor: () => void
-  /** 保存地点编辑（含备选地点），保存后关闭编辑器；编辑会使草案过期，一并清除。 */
-  savePlaceEdit: (
-    dayKey: DateISO,
-    legIndex: number,
-    place: PlaceSlot,
-    alternatives: AlternativePlace[],
-  ) => void
+  /** 保存地点编辑，保存后关闭编辑器；编辑会使草案过期，一并清除。 */
+  savePlaceEdit: (dayKey: DateISO, legIndex: number, place: PlaceSlot) => void
   /** 保存交通时长编辑（基准速度按新时长重算），保存后关闭编辑器。 */
   saveTransportEdit: (
     dayKey: DateISO,
     legIndex: number,
     durationMinutes: number,
   ) => void
+  /** 保存备选库条目（新建或编辑，按 id upsert），保存后关闭编辑器。 */
+  saveAlternative: (dayKey: DateISO, alternative: AlternativePlace) => void
+  /** 删除备选库条目。 */
+  deleteAlternative: (dayKey: DateISO, altId: PlaceId) => void
   /** 插入新地点：afterLegIndex 为 null 追加到当天末尾。 */
   insertPlace: (dayKey: DateISO, afterLegIndex: number | null) => void
   /** 删除地点。 */
@@ -73,15 +76,27 @@ export const useTripStore = create<TripStore>()((set) => ({
   draft: null,
   openEditor: (selection) => set({ editor: selection }),
   closeEditor: () => set({ editor: null }),
-  savePlaceEdit: (dayKey, legIndex, place, alternatives) =>
+  savePlaceEdit: (dayKey, legIndex, place) =>
     set((state) => ({
-      trip: withPlaceSaved(state.trip, dayKey, legIndex, place, alternatives),
+      trip: withPlaceSaved(state.trip, dayKey, legIndex, place),
       editor: null,
       draft: null,
     })),
   saveTransportEdit: (dayKey, legIndex, durationMinutes) =>
     set((state) => ({
       trip: withTransportDuration(state.trip, dayKey, legIndex, durationMinutes),
+      editor: null,
+      draft: null,
+    })),
+  saveAlternative: (dayKey, alternative) =>
+    set((state) => ({
+      trip: withAlternativeSaved(state.trip, dayKey, alternative),
+      editor: null,
+      draft: null,
+    })),
+  deleteAlternative: (dayKey, altId) =>
+    set((state) => ({
+      trip: withAlternativeDeleted(state.trip, dayKey, altId),
       editor: null,
       draft: null,
     })),

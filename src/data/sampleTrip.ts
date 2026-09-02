@@ -27,7 +27,8 @@ import type {
  * 刻意覆盖的测试场景（供阶段 2/3 手动验收）：
  * - 固定预约：晴空塔 12:00、涩谷 Sky 14:00、teamLab 14:00
  * - 可取消地点：三顿午餐、竹下通、台场海滨公园（minStay 为空）
- * - 备选地点：三顿午餐各关联 2 个备选
+ * - 备选地点库：三顿午餐各链接 2 个日级备选，属性完全独立
+ *   （各自的开放时间、停留时长/上下限、优先级）
  * - 开放时间边界：银座 09:45 到达但 10:00 才开门（蓄意的冲突案例）
  * - 空档：第 1 天 11:20–11:40 缓冲、第 3 天 13:10–13:30 排队缓冲
  * - 跨日窗口：第 3 天 08:00 开始（早于默认 09:00）
@@ -53,23 +54,28 @@ interface LegSeed {
   stayMinutes: number
   /** 到达该地点的交通时长；首段行程不填。 */
   transportMinutes?: number
-  alternatives?: AlternativeSeed[]
 }
 
-type AlternativeSeed = PlaceSeedBase
+/** 日级备选库条目种子：属性独立，linkedTo 指向当日的计划地点 id。 */
+interface AlternativeSeed extends PlaceSeedBase {
+  stayMinutes: number
+  linkedTo: PlaceId
+}
 
-/** 种子数据 → 存储结构的备选地点（缺省字段补 null）。 */
+/** 备选种子 → 存储结构（缺省约束字段补 null）。 */
 function toAlternative(seed: AlternativeSeed): AlternativePlace {
   return {
     id: seed.id,
     name: seed.name,
     location: seed.location,
     priority: seed.priority,
+    durationMinutes: seed.stayMinutes,
     open: seed.open ?? null,
     close: seed.close ?? null,
     minStayMinutes: seed.minStay ?? null,
     maxStayMinutes: seed.maxStay ?? null,
     fixedStart: seed.fixedStart ?? null,
+    linkedPlaceId: seed.linkedTo,
   }
 }
 
@@ -141,11 +147,7 @@ function buildLegs(
       maxStayMinutes: place.maxStay ?? null,
       fixedStart: place.fixedStart ?? null,
     }
-    legs.push({
-      transport,
-      place: slot,
-      alternatives: (seed.alternatives ?? []).map(toAlternative),
-    })
+    legs.push({ transport, place: slot })
     cursor = placeStart + stayMinutes * MS_PER_MINUTE
     previousLocation = place.location
   }
@@ -209,7 +211,7 @@ function day1Seeds(): LegSeed[] {
       transportMinutes: 20,
     },
     {
-      // 可取消午餐 + 2 个备选（阶段 7 备选机制的数据载体）
+      // 可取消午餐；它的 2 个备选在 day1Alternatives（日级库）
       place: {
         id: 'd1-lunch',
         name: '晴空塔附近定食屋',
@@ -218,20 +220,6 @@ function day1Seeds(): LegSeed[] {
       },
       stayMinutes: 60,
       transportMinutes: 5,
-      alternatives: [
-        {
-          id: 'd1-alt-sushi',
-          name: '午餐备选：浅草回转寿司',
-          location: TOKYO.d1Lunch,
-          priority: 5,
-        },
-        {
-          id: 'd1-alt-conbini',
-          name: '午餐备选：便利店简餐',
-          location: TOKYO.d1Lunch,
-          priority: 6,
-        },
-      ],
     },
     {
       place: {
@@ -313,20 +301,6 @@ function day2Seeds(): LegSeed[] {
       },
       stayMinutes: 60,
       transportMinutes: 5,
-      alternatives: [
-        {
-          id: 'd2-alt-crepe',
-          name: '午餐备选：竹下通可丽饼',
-          location: TOKYO.takeshita,
-          priority: 5,
-        },
-        {
-          id: 'd2-alt-conbini',
-          name: '午餐备选：便利店饭团',
-          location: TOKYO.takeshita,
-          priority: 6,
-        },
-      ],
     },
     {
       place: {
@@ -427,20 +401,6 @@ function day3Seeds(): LegSeed[] {
       },
       stayMinutes: 70,
       transportMinutes: 5,
-      alternatives: [
-        {
-          id: 'd3-alt-katsu',
-          name: '午餐备选：银座炸猪排',
-          location: TOKYO.d3Lunch,
-          priority: 3,
-        },
-        {
-          id: 'd3-alt-underground',
-          name: '午餐备选：银座站地下简餐',
-          location: TOKYO.d3Lunch,
-          priority: 5,
-        },
-      ],
     },
     {
       // 固定预约 14:00；午餐 13:10 结束后留 20 分钟排队缓冲空档
@@ -497,6 +457,91 @@ function day3Seeds(): LegSeed[] {
 }
 
 /**
+ * 第 1 天备选地点库：两个午餐备选，属性刻意各不相同
+ * （回转寿司有明确开放时间与停留上下限；便利店无任何约束）。
+ */
+function day1Alternatives(): AlternativePlace[] {
+  const seeds: AlternativeSeed[] = [
+    {
+      id: 'd1-alt-sushi',
+      name: '浅草回转寿司',
+      location: TOKYO.sensoji,
+      priority: 5,
+      stayMinutes: 45,
+      open: 11 * 60,
+      close: 21 * 60,
+      minStay: 30,
+      maxStay: 60,
+      linkedTo: 'd1-lunch',
+    },
+    {
+      id: 'd1-alt-conbini',
+      name: '便利店简餐',
+      location: TOKYO.d1Lunch,
+      priority: 6,
+      stayMinutes: 30,
+      linkedTo: 'd1-lunch',
+    },
+  ]
+  return seeds.map(toAlternative)
+}
+
+/** 第 2 天备选地点库。 */
+function day2Alternatives(): AlternativePlace[] {
+  const seeds: AlternativeSeed[] = [
+    {
+      id: 'd2-alt-crepe',
+      name: '竹下通可丽饼',
+      location: TOKYO.takeshita,
+      priority: 5,
+      stayMinutes: 30,
+      open: 10 * 60,
+      close: 20 * 60,
+      maxStay: 45,
+      linkedTo: 'd2-lunch',
+    },
+    {
+      id: 'd2-alt-conbini',
+      name: '便利店饭团',
+      location: TOKYO.d2Lunch,
+      priority: 6,
+      stayMinutes: 30,
+      linkedTo: 'd2-lunch',
+    },
+  ]
+  return seeds.map(toAlternative)
+}
+
+/** 第 3 天备选地点库。 */
+function day3Alternatives(): AlternativePlace[] {
+  const seeds: AlternativeSeed[] = [
+    {
+      id: 'd3-alt-katsu',
+      name: '银座炸猪排',
+      location: TOKYO.d3Lunch,
+      priority: 3,
+      stayMinutes: 50,
+      open: 11 * 60,
+      close: 21 * 60 + 30,
+      minStay: 40,
+      maxStay: 80,
+      linkedTo: 'd3-lunch',
+    },
+    {
+      id: 'd3-alt-underground',
+      name: '银座站地下简餐',
+      location: TOKYO.ginza,
+      priority: 5,
+      stayMinutes: 40,
+      open: 8 * 60,
+      close: 22 * 60,
+      linkedTo: 'd3-lunch',
+    },
+  ]
+  return seeds.map(toAlternative)
+}
+
+/**
  * 构建示例行程。
  * 每次调用都会重新计算"今天"作为第 1 天，因此仅在首次初始化/数据重置时调用。
  */
@@ -506,9 +551,21 @@ export function createSampleTrip(): Trip {
   const day2 = addDaysToDayKey(day1, 1)
   const day3 = addDaysToDayKey(day1, 2)
   const days: DayPlan[] = [
-    { date: day1, legs: buildLegs(day1, 9 * 60, day1Seeds(), timezone) },
-    { date: day2, legs: buildLegs(day2, 9 * 60, day2Seeds(), timezone) },
-    { date: day3, legs: buildLegs(day3, 8 * 60, day3Seeds(), timezone) },
+    {
+      date: day1,
+      legs: buildLegs(day1, 9 * 60, day1Seeds(), timezone),
+      alternatives: day1Alternatives(),
+    },
+    {
+      date: day2,
+      legs: buildLegs(day2, 9 * 60, day2Seeds(), timezone),
+      alternatives: day2Alternatives(),
+    },
+    {
+      date: day3,
+      legs: buildLegs(day3, 8 * 60, day3Seeds(), timezone),
+      alternatives: day3Alternatives(),
+    },
   ]
   return {
     schemaVersion: SCHEMA_VERSION,

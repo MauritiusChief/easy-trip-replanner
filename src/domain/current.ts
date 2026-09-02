@@ -1,6 +1,6 @@
 import { MS_PER_MINUTE } from './config'
 import { getDayWindowUtc, getZonedDayKey } from './time'
-import type { DateISO, EpochMs, PlaceId, Trip } from './types'
+import type { AlternativePlace, DateISO, EpochMs, PlaceId, Trip } from './types'
 import type { Leg } from './types'
 
 /**
@@ -55,6 +55,17 @@ export function getTripDayWindow(
 /** 按日期键与下标查找某段行程，找不到（数据不一致）时返回 undefined。 */
 export function findLeg(trip: Trip, dayKey: DateISO, legIndex: number): Leg | undefined {
   return trip.days.find((day) => day.date === dayKey)?.legs[legIndex]
+}
+
+/** 按日期键与 id 查找备选库条目，找不到（已删除）时返回 undefined。 */
+export function findAlternative(
+  trip: Trip,
+  dayKey: DateISO,
+  altId: PlaceId,
+): AlternativePlace | undefined {
+  return trip.days
+    .find((day) => day.date === dayKey)
+    ?.alternatives.find((entry) => entry.id === altId)
 }
 
 /**

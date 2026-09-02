@@ -126,6 +126,73 @@ button.slot {
   color: var(--text-soft);
 }
 
+/* 备选库入口徽标（day-head 内，需求 7） */
+.lib-badge {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+
+.lib-badge.is-open {
+  color: #ffffff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* 备选地点库（需求 7）：day-head 下方展开的堆叠卡片列表。
+   视觉上类似时间轴卡片，但不是时间轴：无时间行、与当天计划顺序无关。 */
+.alt-library {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--accent-border);
+  border-radius: 10px;
+}
+
+.alt-library-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.alt-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  font: inherit;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chip-link {
+  background: transparent;
+  border: 1px dashed var(--accent-border);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.chip-unlinked {
+  background: transparent;
+  border: 1px dashed var(--notice-border);
+  color: var(--notice-text);
+}
+
 .slot-place {
   background: var(--accent-soft);
 }

@@ -1,5 +1,9 @@
-/** 本地数据格式版本，结构变更时递增并配套迁移/回退逻辑。 */
-export const SCHEMA_VERSION = 1
+/**
+ * 本地数据格式版本，结构变更时递增。
+ * v2：备选地点从 Leg 内嵌移至日级备选地点库，属性独立并携带链接字段。
+ * 版本不符的存档直接重置为示例行程（见 storage.loadTrip）。
+ */
+export const SCHEMA_VERSION = 2
 
 /** localStorage 键名。整个应用只使用这一个键。 */
 export const STORAGE_KEY = 'easy-trip-replanner:trip'

@@ -66,20 +66,17 @@ function buildRows(day: DayPlan, startUtc: EpochMs, endUtc: EpochMs): Row[] {
  * 停留约束摘要：按 min/max 的组合生成可读文本。
  * min 为 null 的可取消地点不在此显示（由"可取消"徽标单独表达）。
  */
-function stayLabel(leg: Leg): string | null {
-  const { minStayMinutes, maxStayMinutes } = leg.place
-  if (minStayMinutes !== null && maxStayMinutes !== null) {
-    return `停留 ${minStayMinutes}–${maxStayMinutes} 分钟`
-  }
-  if (minStayMinutes !== null) return `停留 ≥${minStayMinutes} 分钟`
-  if (maxStayMinutes !== null) return `停留 ≤${maxStayMinutes} 分钟`
+function stayLabel(minStay: number | null, maxStay: number | null): string | null {
+  if (minStay !== null && maxStay !== null) return `停留 ${minStay}–${maxStay} 分钟`
+  if (minStay !== null) return `停留 ≥${minStay} 分钟`
+  if (maxStay !== null) return `停留 ≤${maxStay} 分钟`
   return null
 }
 
 /** 地点行下方的规划属性徽标：优先级、固定锚点、可取消、开放时间、停留约束。 */
 function PlaceMeta({ leg }: { leg: Leg }) {
-  const { open, close, minStayMinutes, fixedStart, priority } = leg.place
-  const stay = stayLabel(leg)
+  const { open, close, minStayMinutes, maxStayMinutes, fixedStart, priority } = leg.place
+  const stay = stayLabel(minStayMinutes, maxStayMinutes)
   return (
     <div className="slot-meta">
       <span className="chip">优先级 {priority}</span>
@@ -100,8 +97,9 @@ function PlaceMeta({ leg }: { leg: Leg }) {
 /**
  * 单日行程卡片：
  * - 地点/交通行可点击进入对应编辑表单（需求 8.2）
- * - 卡片头部显示警告徽标（可展开明细），底部提供"添加地点"与
- *   "重排当天剩余行程"入口（需求 8.3；重排引擎阶段 3 实现）
+ * - 卡片头部显示警告徽标（可展开明细）与"备选库"入口（需求 7），
+ *   库以堆叠卡片形式展示，不是时间轴
+ * - 底部提供"添加地点"与"重排当天剩余行程"入口（需求 8.3）
  */
 export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
   const timeZone = trip.timezone
@@ -114,6 +112,7 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
   const [replanPanelOpen, setReplanPanelOpen] = useState(false)
   const [includeAlternatives, setIncludeAlternatives] = useState(false)
   const [showWarnings, setShowWarnings] = useState(false)
+  const [libraryOpen, setLibraryOpen] = useState(false)
   // 草案全局只保留一份；只在与本日相关时显示
   const dayDraft = draft && draft.day === day.date ? draft : null
 
@@ -142,11 +141,93 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
             ⚠ {warnings.length} 项提示
           </button>
         )}
+        <button
+          type="button"
+          className={libraryOpen ? 'lib-badge is-open' : 'lib-badge'}
+          onClick={() => setLibraryOpen((open) => !open)}
+          aria-expanded={libraryOpen}
+        >
+          备选库 {day.alternatives.length}
+        </button>
         <span className="day-window">
           {formatMinuteOfDay(trip.dayOverrides[day.date]?.start ?? trip.dailyStart)}–
           {formatMinuteOfDay(trip.dayOverrides[day.date]?.end ?? trip.dailyEnd)}
         </span>
       </div>
+      {libraryOpen && (
+        <div className="alt-library">
+          <div className="alt-library-head">
+            <span>备选地点库</span>
+            <button
+              type="button"
+              className="btn"
+              onClick={() =>
+                openEditor({ type: 'alternative', dayKey: day.date, altId: null })
+              }
+            >
+              ＋ 添加备选
+            </button>
+          </div>
+          {day.alternatives.length === 0 ? (
+            <p className="day-empty">暂无备选地点</p>
+          ) : (
+            day.alternatives.map((alternative) => {
+              const linkedPlace =
+                alternative.linkedPlaceId !== null
+                  ? day.legs.find((leg) => leg.place.id === alternative.linkedPlaceId)
+                      ?.place
+                  : undefined
+              const stay = stayLabel(
+                alternative.minStayMinutes,
+                alternative.maxStayMinutes,
+              )
+              return (
+                <button
+                  key={alternative.id}
+                  type="button"
+                  className="alt-card"
+                  aria-label={`编辑备选 ${alternative.name}`}
+                  onClick={() =>
+                    openEditor({
+                      type: 'alternative',
+                      dayKey: day.date,
+                      altId: alternative.id,
+                    })
+                  }
+                >
+                  <div className="slot-top">
+                    <span>{alternative.name}</span>
+                    <span
+                      className={linkedPlace ? 'chip chip-link' : 'chip chip-unlinked'}
+                    >
+                      {linkedPlace ? `备用于 ${linkedPlace.name}` : '未连接'}
+                    </span>
+                  </div>
+                  <div className="slot-meta">
+                    <span className="chip">优先级 {alternative.priority}</span>
+                    <span className="chip">停留 {alternative.durationMinutes} 分钟</span>
+                    {alternative.fixedStart !== null && (
+                      <span className="chip chip-fixed">
+                        固定 {formatMinuteOfDay(alternative.fixedStart)} 开始
+                      </span>
+                    )}
+                    {alternative.minStayMinutes === null && (
+                      <span className="chip chip-cancellable">可取消</span>
+                    )}
+                    {alternative.open !== null && alternative.close !== null && (
+                      <span className="chip">
+                        开放 {formatMinuteOfDay(alternative.open)}–
+                        {formatMinuteOfDay(alternative.close)}
+                      </span>
+                    )}
+                    {stay !== null && <span className="chip">{stay}</span>}
+                  </div>
+                </button>
+              )
+            })
+          )}
+        </div>
+      )}
       {showWarnings && warnings.length > 0 && (
         <ul className="warn-list">
           {warnings.map((warning, index) => (
@@ -235,15 +316,6 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
                   </span>
                 </div>
                 <PlaceMeta leg={leg} />
-                {leg.alternatives.length > 0 && (
-                  <div className="slot-meta">
-                    {leg.alternatives.map((alternative) => (
-                      <span key={alternative.id} className="chip chip-alt">
-                        {alternative.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
               </button>
             )
           })}
