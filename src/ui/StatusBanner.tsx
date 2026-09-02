@@ -2,6 +2,7 @@ import { findLeg } from '../domain/current'
 import type { CurrentPosition } from '../domain/current'
 import { formatZonedTime } from '../domain/time'
 import type { Trip } from '../domain/types'
+import './StatusBanner.css'
 
 /**
  * 把当前位置翻译成用户文案（需求 9.1）：

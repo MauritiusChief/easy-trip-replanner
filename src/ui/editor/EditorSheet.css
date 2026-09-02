@@ -1,0 +1,155 @@
+/* 底部抽屉编辑器（EditorSheet）：遮罩、抽屉容器与表单字段 */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 31;
+  background: var(--card);
+  border-radius: 16px 16px 0 0;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  max-height: 88svh;
+  /* 纵向滚动承载表单；横向禁止拖动，防止输入框固有宽度把抽屉撑出水平溢出 */
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--shadow);
+}
+
+.sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.sheet-head strong {
+  font-size: 15px;
+  color: var(--text-h);
+}
+
+.editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.field input {
+  font: inherit;
+  font-size: 16px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  /* input 有约 170px 的固有默认宽度，必须允许收缩，否则窄屏溢出 */
+  width: 100%;
+  min-width: 0;
+}
+
+.field-grid {
+  display: grid;
+  /* minmax(0, 1fr) 覆盖 1fr 轨道默认的 min-width:auto，允许内容收缩 */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.field-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.field-check input {
+  width: 18px;
+  height: 18px;
+}
+
+.alt-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.alt-row input {
+  font: inherit;
+  font-size: 15px;
+  min-height: 36px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  width: 100%;
+  min-width: 0;
+}
+
+.alt-row-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.sheet-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  background: var(--card);
+}
+
+.sheet-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--notice-text);
+}
+
+.editor-info {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+@media (min-width: 720px) {
+  .sheet {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: 560px;
+    bottom: 16px;
+    border-radius: 16px;
+  }
+}

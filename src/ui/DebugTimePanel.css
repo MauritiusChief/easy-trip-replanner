@@ -1,0 +1,78 @@
+/* 调试时间面板（DebugTimePanel）：底部固定卡片，键盘 time 唤起 */
+
+.debug-panel {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  z-index: 20;
+  background: var(--card);
+  border: 1px solid var(--accent-border);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow);
+}
+
+.debug-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.debug-head strong {
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+.debug-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.debug-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.debug-actions button,
+.debug-head button {
+  font: inherit;
+  font-size: 13px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--chip-bg);
+  color: var(--text);
+}
+
+.debug-actions button:active,
+.debug-head button:active {
+  border-color: var(--accent);
+}
+
+.debug-panel input[type='datetime-local'] {
+  font: inherit;
+  font-size: 14px;
+  min-height: 36px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  min-width: 0;
+}
+
+.debug-hint {
+  font-size: 12px;
+  color: var(--text-soft);
+}

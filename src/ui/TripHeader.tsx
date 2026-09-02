@@ -1,5 +1,6 @@
 import { dayKeyToLabel, dayKeyToWeekdayLabel, formatMinuteOfDay } from '../domain/time'
 import type { Trip } from '../domain/types'
+import './TripHeader.css'
 
 /** 行程头部：名称、起止日期（含星期）、统一每日窗口与旅行时区。 */
 export function TripHeader({ trip }: { trip: Trip }) {

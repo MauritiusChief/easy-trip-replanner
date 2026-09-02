@@ -1,0 +1,14 @@
+/* 状态横幅（StatusBanner）：吸附在页面顶部，展示"此刻应该在哪儿" */
+
+.status-banner {
+  position: sticky;
+  top: 8px;
+  z-index: 10;
+  background: var(--accent);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}

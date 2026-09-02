@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { MS_PER_MINUTE } from '../domain/config'
 import { formatZonedTime } from '../domain/time'
 import type { EpochMs } from '../domain/types'
+import './DebugTimePanel.css'
 
 interface DebugTimePanelProps {
   /** 是否展开；收起时不渲染任何内容（热键监听在 App 层，关闭后仍可再次唤起）。 */

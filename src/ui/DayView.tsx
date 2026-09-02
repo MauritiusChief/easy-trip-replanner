@@ -1,6 +1,8 @@
+import { useMemo, useState } from 'react'
 import { MS_PER_MINUTE } from '../domain/config'
 import type { CurrentPosition } from '../domain/current'
 import { getTripDayWindow } from '../domain/current'
+import { collectDayWarnings } from '../domain/warnings'
 import {
   dayKeyToLabel,
   dayKeyToWeekdayLabel,
@@ -8,6 +10,8 @@ import {
   formatZonedTime,
 } from '../domain/time'
 import type { DateISO, DayPlan, EpochMs, Leg, Trip } from '../domain/types'
+import { useTripStore } from '../state/tripStore'
+import './DayView.css'
 
 /**
  * 日卡片内的一行渲染单元。
@@ -94,14 +98,21 @@ function PlaceMeta({ leg }: { leg: Leg }) {
 }
 
 /**
- * 单日行程卡片（只读）：
- * - "今天"徽标与当前 slot 高亮都跟随虚构时间，便于调试时间旅行
- * - 备选地点以虚线徽标展示在对应地点下方，不参与时间轴
+ * 单日行程卡片：
+ * - 地点/交通行可点击进入对应编辑表单（需求 8.2）
+ * - 卡片头部显示警告徽标（可展开明细），底部提供"添加地点"与
+ *   "重排当天剩余行程"入口（需求 8.3；重排引擎阶段 3 实现）
  */
 export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
   const timeZone = trip.timezone
+  const openEditor = useTripStore((state) => state.openEditor)
+  const insertPlace = useTripStore((state) => state.insertPlace)
+  const [showWarnings, setShowWarnings] = useState(false)
+  const [replanNotice, setReplanNotice] = useState<string | null>(null)
+
   const { startUtc, endUtc } = getTripDayWindow(trip, day.date)
   const rows = buildRows(day, startUtc, endUtc)
+  const warnings = useMemo(() => collectDayWarnings(trip, day), [trip, day])
   const isToday = day.date === todayKey
   // position 只在 place/transport 分支携带 legIndex，先收窄再比较
   const active =
@@ -115,11 +126,27 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
           {dayKeyToLabel(day.date)}（{dayKeyToWeekdayLabel(day.date)}）
         </h2>
         {isToday && <span className="badge-today">今天</span>}
+        {warnings.length > 0 && (
+          <button
+            type="button"
+            className="warn-badge"
+            onClick={() => setShowWarnings((visible) => !visible)}
+          >
+            ⚠ {warnings.length} 项提示
+          </button>
+        )}
         <span className="day-window">
           {formatMinuteOfDay(trip.dayOverrides[day.date]?.start ?? trip.dailyStart)}–
           {formatMinuteOfDay(trip.dayOverrides[day.date]?.end ?? trip.dailyEnd)}
         </span>
       </div>
+      {showWarnings && warnings.length > 0 && (
+        <ul className="warn-list">
+          {warnings.map((warning, index) => (
+            <li key={`${warning.kind}-${warning.legIndex}-${index}`}>{warning.message}</li>
+          ))}
+        </ul>
+      )}
       {day.legs.length === 0 ? (
         <p className="day-empty">当日暂无安排</p>
       ) : (
@@ -157,7 +184,15 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
               if (!transport) return null
               const endUtc = transport.start + transport.durationMinutes * MS_PER_MINUTE
               return (
-                <div key={row.key} className={className}>
+                <button
+                  key={row.key}
+                  type="button"
+                  className={className}
+                  aria-label={`编辑前往 ${leg.place.name} 的交通`}
+                  onClick={() =>
+                    openEditor({ type: 'transport', dayKey: day.date, legIndex: row.legIndex })
+                  }
+                >
                   <div className="slot-top">
                     <span>交通 · 前往 {leg.place.name}</span>
                     <span className="slot-time">
@@ -171,12 +206,20 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
                       <span className="chip">约 {transport.baseSpeedKmh} km/h</span>
                     )}
                   </div>
-                </div>
+                </button>
               )
             }
             const placeEnd = leg.place.start + leg.place.durationMinutes * MS_PER_MINUTE
             return (
-              <div key={row.key} className={className}>
+              <button
+                key={row.key}
+                type="button"
+                className={className}
+                aria-label={`编辑 ${leg.place.name}`}
+                onClick={() =>
+                  openEditor({ type: 'place', dayKey: day.date, legIndex: row.legIndex })
+                }
+              >
                 <div className="slot-top">
                   <span>{leg.place.name}</span>
                   <span className="slot-time">
@@ -194,11 +237,24 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
                     ))}
                   </div>
                 )}
-              </div>
+              </button>
             )
           })}
         </div>
       )}
+      <div className="day-actions">
+        <button type="button" className="btn" onClick={() => insertPlace(day.date, null)}>
+          ＋ 添加地点
+        </button>
+        <button
+          type="button"
+          className={warnings.length > 0 ? 'btn btn-accent' : 'btn'}
+          onClick={() => setReplanNotice('重排引擎将在阶段 3 提供，当前可继续手动编辑')}
+        >
+          重排当天剩余行程
+        </button>
+        {replanNotice !== null && <span className="day-action-note">{replanNotice}</span>}
+      </div>
     </section>
   )
 }

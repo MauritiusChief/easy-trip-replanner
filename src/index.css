@@ -1,3 +1,8 @@
+/**
+ * 全局样式：设计变量（含暗色主题）、基础重置、应用壳、提示条与通用按钮。
+ * 组件级样式分别放在各组件同名的 .css 文件中，由组件自行引入。
+ */
+
 :root {
   --bg: #f6f5f2;
   --card: #ffffff;
@@ -87,177 +92,6 @@ p {
   font-size: 14px;
 }
 
-.trip-header {
-  padding: 20px 0 4px;
-}
-
-.trip-header h1 {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-h);
-  margin-bottom: 4px;
-}
-
-.trip-meta {
-  font-size: 13px;
-  color: var(--text-soft);
-}
-
-.status-banner {
-  position: sticky;
-  top: 8px;
-  z-index: 10;
-  background: var(--accent);
-  color: #ffffff;
-  border-radius: 12px;
-  padding: 12px 14px;
-  font-size: 15px;
-  font-weight: 600;
-  box-shadow: var(--shadow);
-}
-
-.day-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.day-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.day-card.is-today {
-  border-color: var(--accent-border);
-}
-
-.day-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.day-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-h);
-}
-
-.day-window {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--text-soft);
-  font-variant-numeric: tabular-nums;
-}
-
-.badge-today {
-  background: var(--accent);
-  color: #ffffff;
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 999px;
-  padding: 2px 8px;
-}
-
-.day-empty {
-  font-size: 14px;
-  color: var(--text-soft);
-}
-
-.slot-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.slot {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border-radius: 10px;
-  padding: 10px 12px;
-  border: 2px solid transparent;
-}
-
-.slot-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-h);
-}
-
-.slot-time {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-soft);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.slot-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-soft);
-}
-
-.chip {
-  background: var(--chip-bg);
-  border-radius: 6px;
-  padding: 2px 8px;
-  font-variant-numeric: tabular-nums;
-}
-
-.chip-fixed {
-  color: var(--fixed-text);
-  font-weight: 600;
-}
-
-.chip-cancellable {
-  border: 1px dashed var(--border);
-  background: transparent;
-}
-
-.chip-alt {
-  background: transparent;
-  border: 1px dashed var(--accent-border);
-  color: var(--text-soft);
-}
-
-.slot-place {
-  background: var(--accent-soft);
-}
-
-.slot-transport {
-  border: 1px dashed var(--border);
-  background: transparent;
-}
-
-.slot-gap {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  background: var(--gap-bg);
-  color: var(--text-soft);
-  font-size: 13px;
-  padding: 6px 12px;
-}
-
-.slot.is-current {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-border);
-}
-
 .app-footer {
   margin-top: auto;
   text-align: center;
@@ -266,59 +100,9 @@ p {
   padding: 12px 0 0;
 }
 
-@media (min-width: 720px) {
-  .day-list {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    align-items: start;
-  }
-}
+/* ===== 通用按钮 ===== */
 
-.debug-panel {
-  position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: calc(12px + env(safe-area-inset-bottom));
-  z-index: 20;
-  background: var(--card);
-  border: 1px solid var(--accent-border);
-  border-radius: 14px;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  box-shadow: var(--shadow);
-}
-
-.debug-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.debug-head strong {
-  font-size: 14px;
-  color: var(--text-h);
-}
-
-.debug-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-soft);
-}
-
-.debug-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.debug-actions button,
-.debug-head button {
+.btn {
   font: inherit;
   font-size: 13px;
   min-height: 36px;
@@ -329,23 +113,16 @@ p {
   color: var(--text);
 }
 
-.debug-actions button:active,
-.debug-head button:active {
+.btn:active {
   border-color: var(--accent);
 }
 
-.debug-panel input[type='datetime-local'] {
-  font: inherit;
-  font-size: 14px;
-  min-height: 36px;
-  padding: 4px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--text);
+.btn-accent {
+  border-color: var(--accent-border);
+  color: var(--accent);
+  font-weight: 600;
 }
 
-.debug-hint {
-  font-size: 12px;
-  color: var(--text-soft);
+.btn-danger {
+  color: var(--notice-text);
 }
