@@ -13,9 +13,6 @@ export const MS_PER_MINUTE = 60_000
 /** haversine 公式使用的地球平均半径（公里）。 */
 export const EARTH_RADIUS_KM = 6371
 
-/** 交通时长的下限（分钟），避免极短交通被取整为 0。 */
-export const MIN_TRANSPORT_MINUTES = TIME_STEP_MINUTES
-
 /**
  * 绕路判定阈值（需求 6.1，阶段 3 使用）：
  * 经过中间点后的总距离超过"直接前往后续地点"距离的 (1 + 0.5) 倍，
@@ -27,7 +24,8 @@ export const DETOUR_EXTRA_KM = 1
 
 /**
  * 速度异常阈值（需求 4.4，阶段 3 使用）：
- * 重排改变前序地点后，新隐含速度与原基准速度偏差超过 ±40% 时向用户警告。
+ * 重排改变前序地点后，交通时长保持用户设定不变，
+ * 系统按新距离重算隐含速度，与基准速度偏差超过 ±40% 时向用户警告。
  * 首版保守值，待实践中调整（阶段 5 调参）。
  */
 export const SPEED_ANOMALY_RATIO = 0.4

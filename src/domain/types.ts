@@ -62,8 +62,10 @@ export type AlternativePlace = Omit<PlaceSlot, 'start' | 'durationMinutes'>
 
 /**
  * 交通 slot（需求 4）：依附于目的地的一段移动。
- * baseSpeedKmh 是用户设定交通时长时按两点距离反推的"隐含速度"基准，
- * 路线变化后据此估算新时长；距离过近无法推断时为 null。
+ * baseSpeedKmh 是用户建立交通时长时按两点距离反推的"隐含速度"基准。
+ * 路线变化（前序地点改变）时交通时长保持不变，系统按新距离重算隐含速度
+ * 并与该基准比较，偏差过大则警告（需求 4.4）；距离过近无法推断时为 null。
+ * 基准不随重排自动改写，仅当用户手动修改时长时才按新时长重算。
  */
 export interface TransportSlot {
   start: EpochMs
