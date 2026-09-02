@@ -107,8 +107,15 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
   const timeZone = trip.timezone
   const openEditor = useTripStore((state) => state.openEditor)
   const insertPlace = useTripStore((state) => state.insertPlace)
+  const draft = useTripStore((state) => state.draft)
+  const runReplan = useTripStore((state) => state.runReplan)
+  const adoptDraft = useTripStore((state) => state.adoptDraft)
+  const discardDraft = useTripStore((state) => state.discardDraft)
+  const [replanPanelOpen, setReplanPanelOpen] = useState(false)
+  const [includeAlternatives, setIncludeAlternatives] = useState(false)
   const [showWarnings, setShowWarnings] = useState(false)
-  const [replanNotice, setReplanNotice] = useState<string | null>(null)
+  // 草案全局只保留一份；只在与本日相关时显示
+  const dayDraft = draft && draft.day === day.date ? draft : null
 
   const { startUtc, endUtc } = getTripDayWindow(trip, day.date)
   const rows = buildRows(day, startUtc, endUtc)
@@ -249,12 +256,74 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
         <button
           type="button"
           className={warnings.length > 0 ? 'btn btn-accent' : 'btn'}
-          onClick={() => setReplanNotice('重排引擎将在阶段 3 提供，当前可继续手动编辑')}
+          onClick={() => setReplanPanelOpen((open) => !open)}
         >
           重排当天剩余行程
         </button>
-        {replanNotice !== null && <span className="day-action-note">{replanNotice}</span>}
       </div>
+      {replanPanelOpen && !dayDraft && (
+        <div className="replan-panel">
+          <label className="field-check">
+            <input
+              type="checkbox"
+              checked={includeAlternatives}
+              onChange={(event) => setIncludeAlternatives(event.target.checked)}
+            />
+            <span>纳入备选地点（原地点排不下时作为替代，需求 7.3）</span>
+          </label>
+          <div className="day-actions">
+            <button
+              type="button"
+              className="btn btn-accent"
+              onClick={() => {
+                runReplan(day.date, now, includeAlternatives)
+                setReplanPanelOpen(false)
+              }}
+            >
+              开始重排
+            </button>
+            <button type="button" className="btn" onClick={() => setReplanPanelOpen(false)}>
+              取消
+            </button>
+          </div>
+        </div>
+      )}
+      {dayDraft && (
+        <div className="draft-card">
+          <div className="day-head">
+            <strong>重排草案</strong>
+            <span className="day-window">
+              {dayDraft.legs.length} 段新安排 · 取消 {dayDraft.cancelledPlaceIds.length} 项 ·
+              提示 {dayDraft.warnings.length} 条
+            </span>
+          </div>
+          {dayDraft.infeasibleReasons.length > 0 && (
+            <ul className="warn-list">
+              {dayDraft.infeasibleReasons.map((reason, index) => (
+                <li key={`reason-${index}`}>{reason}</li>
+              ))}
+            </ul>
+          )}
+          {dayDraft.warnings.length > 0 && (
+            <ul className="warn-list">
+              {dayDraft.warnings.map((warning, index) => (
+                <li key={`warning-${index}`}>{warning.message}</li>
+              ))}
+            </ul>
+          )}
+          {dayDraft.warnings.length === 0 && dayDraft.infeasibleReasons.length === 0 && (
+            <p className="day-empty">草案未产生警告，可直接采纳</p>
+          )}
+          <div className="day-actions">
+            <button type="button" className="btn btn-accent" onClick={adoptDraft}>
+              采纳草案
+            </button>
+            <button type="button" className="btn" onClick={discardDraft}>
+              放弃
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

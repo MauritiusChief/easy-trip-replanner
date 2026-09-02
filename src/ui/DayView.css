@@ -162,6 +162,32 @@ button.slot {
   color: var(--text-soft);
 }
 
+/* 重排选项面板：触发前决定是否纳入备选地点（需求 7.3） */
+.replan-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px dashed var(--accent-border);
+  border-radius: 10px;
+}
+
+/* 重排草案卡片：摘要 + 警告 + 采纳/放弃（完整对比视图属阶段 4） */
+.draft-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+
+.draft-card strong {
+  font-size: 14px;
+  color: var(--text-h);
+}
+
 .warn-badge {
   font: inherit;
   font-size: 12px;

@@ -130,8 +130,9 @@ export interface Trip {
  * - missing-transport：地点缺少到达交通
  * - out-of-window：超出每日可规划窗口
  * - fixed-conflict：违反固定开始时间锚点
- * - min-stay：停留低于最短时长
+ * - min-stay：停留低于最短时长（含重排压缩提示）
  * - storage-invalid：本地存储数据无效
+ * - replan-note：重排引擎的说明性提示（取消/替换等）
  */
 export type WarningKind =
   | 'detour'
@@ -143,6 +144,7 @@ export type WarningKind =
   | 'fixed-conflict'
   | 'min-stay'
   | 'storage-invalid'
+  | 'replan-note'
 
 /** 一条面向用户的规划警告，可关联到某天某段行程。 */
 export interface PlanWarning {

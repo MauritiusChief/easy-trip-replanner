@@ -8,6 +8,7 @@ import type {
   EpochMs,
   Leg,
   PlaceSlot,
+  ReplanDraft,
   TransportSlot,
   Trip,
 } from './types'
@@ -206,4 +207,15 @@ export function withPlaceDeleted(
     }
     return next
   })
+}
+
+/**
+ * 采纳重排草案：用草案段落替换目标日期 fromLegIndex 之后的行程。
+ * 草案由 replan 引擎生成，前缀保持原引用不变（需求 1.2：最终由用户决定）。
+ */
+export function withDraftAdopted(trip: Trip, draft: ReplanDraft): Trip {
+  return mapDay(trip, draft.day, (legs) => [
+    ...legs.slice(0, draft.fromLegIndex),
+    ...draft.legs,
+  ])
 }
