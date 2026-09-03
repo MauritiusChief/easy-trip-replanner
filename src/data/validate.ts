@@ -18,7 +18,7 @@ import type {
  *
  * 总体策略：
  * - 结构性问题（缺字段、类型错误、版本不符）→ 整条拒绝，返回 null，
- *   由 storage 层回退到示例行程并提示用户
+ *   由 storage 层回退到空行程并提示用户
  * - 字段级缺失：可选字段缺省视为 null（无约束），不做修补
  * - 校验只保证"能安全渲染"，语义冲突（时间重叠等）留给阶段 2 的编辑校验层
  */
@@ -198,7 +198,7 @@ function validateOverrides(value: unknown): Record<DateISO, DayWindowOverride> {
 
 /**
  * 校验并还原 Trip。
- * 返回 null 表示数据不可用，调用方应回退到示例行程（见 storage.loadTrip）。
+ * 返回 null 表示数据不可用，调用方应回退到空行程（见 storage.loadTrip）。
  */
 export function validateTrip(raw: unknown): Trip | null {
   if (!isRecord(raw)) return null

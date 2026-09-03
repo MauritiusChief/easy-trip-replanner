@@ -75,7 +75,7 @@ function stayLabel(minStay: number | null, maxStay: number | null): string | nul
 }
 
 /** 地点行下方的规划属性徽标：优先级、固定锚点、可取消、开放时间、停留约束。 */
-function PlaceMeta({ leg }: { leg: Leg }) {
+function PlaceMeta({ leg, conflict }: { leg: Leg; conflict: boolean }) {
   const { open, close, minStayMinutes, maxStayMinutes, fixedStart, priority } = leg.place
   const stay = stayLabel(minStayMinutes, maxStayMinutes)
   return (
@@ -91,6 +91,7 @@ function PlaceMeta({ leg }: { leg: Leg }) {
         </span>
       )}
       {stay !== null && <span className="chip">{stay}</span>}
+      {conflict && <span className="chip chip-overlap">⚠ 时间重叠</span>}
     </div>
   )
 }
@@ -114,6 +115,16 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
   const { startUtc, endUtc } = getTripDayWindow(trip, day.date)
   const rows = buildRows(day, startUtc, endUtc)
   const warnings = useMemo(() => collectDayWarnings(trip, day), [trip, day])
+  // 时间重叠涉及的行程段：给对应 slot 加警告样式（冲突状态，配"⚠ 时间重叠"徽标）
+  const overlapLegs = useMemo(
+    () =>
+      new Set(
+        warnings
+          .filter((warning) => warning.kind === 'overlap' && warning.legIndex !== undefined)
+          .map((warning) => warning.legIndex),
+      ),
+    [warnings],
+  )
   const isToday = day.date === todayKey
   // position 只在 place/transport 分支携带 legIndex，先收窄再比较
   const active =
@@ -261,7 +272,10 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
               active.dayKey === day.date &&
               active.kind === row.kind &&
               active.legIndex === row.legIndex
-            const className = `slot slot-${row.kind}${isCurrent ? ' is-current' : ''}`
+            const conflict = overlapLegs.has(row.legIndex)
+            const className = `slot slot-${row.kind}${isCurrent ? ' is-current' : ''}${
+              conflict ? ' is-conflict' : ''
+            }`
             if (row.kind === 'transport') {
               const transport = leg.transport
               if (!transport) return null
@@ -288,6 +302,7 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
                     {transport.baseSpeedKmh !== null && (
                       <span className="chip">约 {transport.baseSpeedKmh} km/h</span>
                     )}
+                    {conflict && <span className="chip chip-overlap">⚠ 时间重叠</span>}
                   </div>
                 </button>
               )
@@ -310,7 +325,7 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
                     {formatZonedTime(placeEnd, timeZone)}
                   </span>
                 </div>
-                <PlaceMeta leg={leg} />
+                <PlaceMeta leg={leg} conflict={conflict} />
               </button>
             )
           })}

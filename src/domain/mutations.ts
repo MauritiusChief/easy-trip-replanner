@@ -1,13 +1,14 @@
 import { MS_PER_MINUTE } from './config'
 import { getTripDayWindow } from './current'
 import { haversineKm, impliedSpeedKmh } from './geo'
-import { addMinutes } from './time'
+import { addMinutes, listDayKeys } from './time'
 import type {
   AlternativePlace,
   DateISO,
   DayPlan,
   EpochMs,
   Leg,
+  MinuteOfDay,
   PlaceSlot,
   TransportSlot,
   Trip,
@@ -21,6 +22,38 @@ import type {
  * 路线变化时只同步 from/to 坐标快照，时长与基准速度保持不变，
  * 由 warnings 层重算隐含速度并与基准比较来提示用户。
  */
+
+/** 行程级设置（"行程设置"表单的保存输入）。 */
+export interface TripSettings {
+  name: string
+  timezone: string
+  startDate: DateISO
+  endDate: DateISO
+  dailyStart: MinuteOfDay
+  dailyEnd: MinuteOfDay
+}
+
+/**
+ * 保存行程级设置：
+ * - 名称、时区、每日窗口直接覆盖。时区改变不换算既有时刻：
+ *   所有 slot 存的是 UTC 绝对时刻，墙上时钟显示随之改变
+ * - 日期范围变化时把 days 对齐到 [startDate, endDate]：
+ *   范围内缺失的日期补空日，范围外的日期连同其 dayOverrides 一并删除
+ *   （缩小范围是破坏性操作，由表单层负责向用户确认）
+ */
+export function withTripSettingsSaved(trip: Trip, settings: TripSettings): Trip {
+  const existing = new Map(trip.days.map((day) => [day.date, day]))
+  const days: DayPlan[] = listDayKeys(settings.startDate, settings.endDate).map(
+    (key) => existing.get(key) ?? { date: key, legs: [], alternatives: [] },
+  )
+  const overrides: Trip['dayOverrides'] = {}
+  for (const [key, value] of Object.entries(trip.dayOverrides)) {
+    if (key >= settings.startDate && key <= settings.endDate) {
+      overrides[key] = value
+    }
+  }
+  return { ...trip, ...settings, days, dayOverrides: overrides }
+}
 
 /** 新插入地点的默认交通时长（分钟）。新交通没有用户基准，交给用户手动调整。 */
 const DEFAULT_INSERT_TRANSPORT_MINUTES = 30

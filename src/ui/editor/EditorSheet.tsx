@@ -5,6 +5,7 @@ import { useTripStore } from '../../state/tripStore'
 import { AlternativeEditor } from './AlternativeEditor'
 import { PlaceEditor } from './PlaceEditor'
 import { TransportEditor } from './TransportEditor'
+import { TripEditor } from './TripEditor'
 import './EditorSheet.css'
 
 /** 抽屉内可聚焦元素选择器（焦点陷阱用）。 */
@@ -26,7 +27,7 @@ export function EditorSheet() {
   const open = editor !== null
 
   const leg =
-    editor && editor.type !== 'alternative'
+    editor && (editor.type === 'place' || editor.type === 'transport')
       ? findLeg(trip, editor.dayKey, editor.legIndex)
       : undefined
   const alternative =
@@ -37,7 +38,7 @@ export function EditorSheet() {
   useEffect(() => {
     if (!editor) return
     const invalid =
-      (editor.type !== 'alternative' && !leg) ||
+      (editor.type === 'place' || editor.type === 'transport' ? !leg : false) ||
       (editor.type === 'alternative' && editor.altId !== null && !alternative)
     if (invalid) closeEditor()
   }, [editor, leg, alternative, closeEditor])
@@ -85,18 +86,25 @@ export function EditorSheet() {
   }, [editor, closeEditor])
 
   if (!editor) return null
-  if (editor.type !== 'alternative' && !leg) return null
+  if (editor.type === 'place' || editor.type === 'transport') {
+    if (!leg) return null
+  }
 
-  const day = trip.days.find((entry) => entry.date === editor.dayKey)
+  const day =
+    editor.type !== 'trip'
+      ? trip.days.find((entry) => entry.date === editor.dayKey)
+      : undefined
   const dayLabel = day ? `（${dayKeyToLabel(day.date)}）` : ''
   const title =
-    editor.type === 'place'
-      ? `编辑地点 · ${leg?.place.name}${dayLabel}`
-      : editor.type === 'transport'
-        ? `编辑交通 · 前往 ${leg?.place.name}${dayLabel}`
-        : editor.altId === null
-          ? `新增备选地点${dayLabel}`
-          : `编辑备选 · ${alternative?.name ?? ''}${dayLabel}`
+    editor.type === 'trip'
+      ? '行程设置'
+      : editor.type === 'place'
+        ? `编辑地点 · ${leg?.place.name}${dayLabel}`
+        : editor.type === 'transport'
+          ? `编辑交通 · 前往 ${leg?.place.name}${dayLabel}`
+          : editor.altId === null
+            ? `新增备选地点${dayLabel}`
+            : `编辑备选 · ${alternative?.name ?? ''}${dayLabel}`
 
   return (
     <>
@@ -115,7 +123,9 @@ export function EditorSheet() {
             关闭
           </button>
         </div>
-        {editor.type === 'place' ? (
+        {editor.type === 'trip' ? (
+          <TripEditor key="trip" />
+        ) : editor.type === 'place' ? (
           <PlaceEditor key={`place-${editor.dayKey}-${editor.legIndex}`} dayKey={editor.dayKey} legIndex={editor.legIndex} />
         ) : editor.type === 'transport' ? (
           <TransportEditor key={`transport-${editor.dayKey}-${editor.legIndex}`} dayKey={editor.dayKey} legIndex={editor.legIndex} />

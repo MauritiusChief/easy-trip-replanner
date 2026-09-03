@@ -219,6 +219,19 @@ button.slot {
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
+/* 时间重叠（冲突状态）：警告底色 + 描边，slot 内配"⚠ 时间重叠"文字徽标 */
+.slot.is-conflict {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.chip-overlap {
+  background: transparent;
+  border: 1px dashed var(--warning-border);
+  color: var(--warning-text);
+  font-weight: 600;
+}
+
 .day-actions {
   display: flex;
   flex-wrap: wrap;

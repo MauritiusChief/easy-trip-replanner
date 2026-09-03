@@ -1,7 +1,7 @@
 /**
  * 本地数据格式版本，结构变更时递增。
  * v2：备选地点从 Leg 内嵌移至日级备选地点库，属性独立并携带链接字段。
- * 版本不符的存档直接重置为示例行程（见 storage.loadTrip）。
+ * 版本不符的存档直接重置为空行程（见 storage.loadTrip）。
  */
 export const SCHEMA_VERSION = 2
 
@@ -33,9 +33,6 @@ export const DETOUR_EXTRA_KM = 1
  * 首版保守值，待实践中调整（阶段 5 调参）。
  */
 export const SPEED_ANOMALY_RATIO = 0.4
-
-/** 示例行程使用的时区（东京），便于演示真实坐标与固定预约场景。 */
-export const DEFAULT_SAMPLE_TIMEZONE = 'Asia/Tokyo'
 
 /** 默认每日窗口 08:00–22:00（旅行时区当日分钟）。 */
 export const DEFAULT_DAILY_START = 8 * 60

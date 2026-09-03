@@ -7,6 +7,7 @@ import {
   withPlaceInserted,
   withPlaceSaved,
   withTransportDuration,
+  withTripSettingsSaved,
 } from '../domain/mutations'
 import {
   resolveSessionPredecessor,
@@ -27,6 +28,7 @@ import type {
   ManualReorderSave,
   ManualReorderSession,
 } from '../domain/manualReorder'
+import type { TripSettings } from '../domain/mutations'
 
 /**
  * 全局状态：
@@ -37,8 +39,9 @@ import type {
  * - resetReason / saveFailed：数据加载与持久化的用户提示
  */
 
-/** 编辑器目标：某天的某个地点/交通段，或备选库条目（altId 为 null 表示新建）。 */
+/** 编辑器目标：行程设置、某天的某个地点/交通段，或备选库条目（altId 为 null 表示新建）。 */
 export type EditorSelection =
+  | { type: 'trip' }
   | { type: 'place'; dayKey: DateISO; legIndex: number }
   | { type: 'transport'; dayKey: DateISO; legIndex: number }
   | { type: 'alternative'; dayKey: DateISO; altId: PlaceId | null }
@@ -55,6 +58,8 @@ export interface TripStore {
   reorderSession: ManualReorderSession | null
   openEditor: (selection: EditorSelection) => void
   closeEditor: () => void
+  /** 保存行程级设置（名称/时区/日期范围/每日窗口），保存后关闭编辑器。 */
+  saveTripSettings: (settings: TripSettings) => void
   /** 保存地点编辑，保存后关闭编辑器。 */
   savePlaceEdit: (dayKey: DateISO, legIndex: number, place: PlaceSlot) => void
   /** 保存交通时长编辑（基准速度按新时长重算），保存后关闭编辑器。 */
@@ -93,6 +98,11 @@ export const useTripStore = create<TripStore>()((set) => ({
   reorderSession: null,
   openEditor: (selection) => set({ editor: selection }),
   closeEditor: () => set({ editor: null }),
+  saveTripSettings: (settings) =>
+    set((state) => ({
+      trip: withTripSettingsSaved(state.trip, settings),
+      editor: null,
+    })),
   savePlaceEdit: (dayKey, legIndex, place) =>
     set((state) => ({
       trip: withPlaceSaved(state.trip, dayKey, legIndex, place),
@@ -160,7 +170,7 @@ useTripStore.subscribe((state, prevState) => {
   if (!saveTrip(state.trip)) useTripStore.setState({ saveFailed: true })
 })
 
-// 首次打开或数据被重置为示例时立即落盘种子，保证刷新后数据仍在。
-if (initial.source === 'sample') {
+// 首次打开或数据被重置为空行程时立即落盘，保证后续刷新直接进入"storage"路径。
+if (initial.source === 'empty') {
   if (!saveTrip(initial.trip)) useTripStore.setState({ saveFailed: true })
 }

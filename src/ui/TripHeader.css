@@ -4,6 +4,13 @@
   padding: 20px 0 4px;
 }
 
+.trip-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .trip-header h1 {
   font-size: 22px;
   font-weight: 700;
