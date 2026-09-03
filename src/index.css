@@ -60,6 +60,25 @@
   box-sizing: border-box;
 }
 
+/* 键盘可见焦点（阶段 4 可访问性）：仅键盘导航时显示，不干扰鼠标点击 */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 读屏专用文本：视觉隐藏但可被辅助技术访问（如 aria-live 播报区） */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -105,12 +124,19 @@ p {
 .btn {
   font: inherit;
   font-size: 13px;
-  min-height: 36px;
+  min-height: 40px;
   padding: 6px 12px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--chip-bg);
   color: var(--text);
+}
+
+/* 触屏设备放大操作目标（阶段 4 移动体验） */
+@media (pointer: coarse) {
+  .btn {
+    min-height: 44px;
+  }
 }
 
 .btn:active {

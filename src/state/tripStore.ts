@@ -4,11 +4,13 @@ import {
   withAlternativeDeleted,
   withAlternativeSaved,
   withDraftAdopted,
+  withLegReplaced,
   withPlaceDeleted,
   withPlaceInserted,
   withPlaceSaved,
   withTransportDuration,
 } from '../domain/mutations'
+import { buildDraftDiff, countDraftChanges } from '../domain/draftDiff'
 import { buildReplanDraft } from '../domain/replan'
 import type {
   AlternativePlace,
@@ -19,6 +21,7 @@ import type {
   ReplanDraft,
   Trip,
 } from '../domain/types'
+import type { DraftDiffItem } from '../domain/draftDiff'
 
 /**
  * 全局状态（阶段 2 引入 zustand，阶段 3 扩展重排草案与备选库）：
@@ -60,6 +63,12 @@ export interface TripStore {
   deletePlace: (dayKey: DateISO, legIndex: number) => void
   /** 触发当天剩余行程的重排，生成草案（不直接修改计划）。 */
   runReplan: (dayKey: DateISO, now: EpochMs, includeAlternatives: boolean) => void
+  /**
+   * 逐项采纳（阶段 4）：把对比视图中的一个变更条目写入正式计划，
+   * 然后按原参数重建草案——草案始终基于当前计划状态（需求 5.1），
+   * 剩余条目会随新状态刷新；重建后若无实质变化则草案清除。
+   */
+  applyDraftItem: (item: DraftDiffItem, now: EpochMs) => void
   /** 采纳草案：替换目标日期的剩余行程，草案清除。 */
   adoptDraft: () => void
   /** 放弃草案。 */
@@ -116,6 +125,40 @@ export const useTripStore = create<TripStore>()((set) => ({
     set((state) => ({
       draft: buildReplanDraft(state.trip, dayKey, now, includeAlternatives),
     })),
+  applyDraftItem: (item, now) =>
+    set((state) => {
+      const draft = state.draft
+      if (!draft) return {}
+      // 变更条目都以"原计划剩余区中的位置"为写入目标；
+      // 纯换入段（无原地点，防御分支）没有落点，忽略
+      if (item.originalIndex === null) return {}
+      const absIndex = draft.fromLegIndex + item.originalIndex
+      const day = state.trip.days.find((entry) => entry.date === draft.day)
+      if (!day || absIndex >= day.legs.length) return { draft: null }
+      const trip =
+        item.kind === 'cancelled'
+          ? withPlaceDeleted(state.trip, draft.day, absIndex)
+          : item.draftLeg !== null
+            ? withLegReplaced(state.trip, draft.day, absIndex, item.draftLeg)
+            : state.trip
+      if (trip === state.trip) return {}
+      // 按原参数重建：剩余条目基于新计划重新排程，保持草案连贯。
+      // 重建出"无可排内容"的失败草案（或已无实质变化）时直接清除草案
+      const next = buildReplanDraft(trip, draft.day, now, draft.includeAlternatives)
+      const failed =
+        next.legs.length === 0 && next.cancelledPlaceIds.length === 0
+      const diff = failed ? null : buildDraftDiff(trip, next)
+      return {
+        trip,
+        draft:
+          failed ||
+          (diff !== null &&
+            countDraftChanges(diff) === 0 &&
+            next.infeasibleReasons.length === 0)
+            ? null
+            : next,
+      }
+    }),
   adoptDraft: () =>
     set((state) =>
       state.draft

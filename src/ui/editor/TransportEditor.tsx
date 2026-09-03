@@ -26,7 +26,8 @@ export function TransportEditor({ dayKey, legIndex }: TransportEditorProps) {
   const [duration, setDuration] = useState(
     transport ? String(transport.durationMinutes) : '30',
   )
-  const [error, setError] = useState<string | null>(null)
+  // 错误关联到时长输入框（阶段 4 可访问性）
+  const [error, setError] = useState(false)
 
   if (!leg || !transport) return null
 
@@ -44,7 +45,8 @@ export function TransportEditor({ dayKey, legIndex }: TransportEditorProps) {
 
   const handleSave = () => {
     if (!valid) {
-      setError('交通时长必须为正数分钟')
+      setError(true)
+      document.getElementById('te-duration')?.focus()
       return
     }
     saveTransportEdit(
@@ -63,6 +65,9 @@ export function TransportEditor({ dayKey, legIndex }: TransportEditorProps) {
       <label className="field">
         <span>交通时长（分钟）</span>
         <input
+          id="te-duration"
+          aria-invalid={error || undefined}
+          aria-describedby={error ? 'editor-form-error' : undefined}
           value={duration}
           inputMode="numeric"
           onChange={(event) => setDuration(event.target.value)}
@@ -74,9 +79,9 @@ export function TransportEditor({ dayKey, legIndex }: TransportEditorProps) {
           {previewAnomaly && ' · 与基准偏差较大，请确认是否合理'}
         </p>
       )}
-      {error !== null && (
-        <p className="sheet-error" role="alert">
-          {error}
+      {error && (
+        <p className="sheet-error" id="editor-form-error" role="alert">
+          交通时长必须为正数分钟
         </p>
       )}
       <div className="sheet-actions">

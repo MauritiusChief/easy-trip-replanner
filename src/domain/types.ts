@@ -178,6 +178,8 @@ export interface PlanWarning {
   kind: WarningKind
   day: DateISO
   legIndex?: number
+  /** 关联的地点 id（重排引擎的取消/压缩/替换提示使用），供草案对比按条目归属。 */
+  placeId?: PlaceId
   message: string
 }
 
@@ -197,4 +199,6 @@ export interface ReplanDraft {
   /** 无法满足硬约束时的原因说明。 */
   infeasibleReasons: string[]
   createdAt: EpochMs
+  /** 生成草案时的"纳入备选地点"开关；逐项采纳后重建草案需要沿用同一参数。 */
+  includeAlternatives: boolean
 }

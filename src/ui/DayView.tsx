@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { MS_PER_MINUTE } from '../domain/config'
 import type { CurrentPosition } from '../domain/current'
 import { getTripDayWindow } from '../domain/current'
+import { countDraftChanges, buildDraftDiff } from '../domain/draftDiff'
 import { collectDayWarnings } from '../domain/warnings'
 import {
   dayKeyToLabel,
@@ -11,6 +12,7 @@ import {
 } from '../domain/time'
 import type { DateISO, DayPlan, EpochMs, Leg, Trip } from '../domain/types'
 import { useTripStore } from '../state/tripStore'
+import { DraftCompare } from './DraftCompare'
 import './DayView.css'
 
 /**
@@ -107,14 +109,19 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
   const insertPlace = useTripStore((state) => state.insertPlace)
   const draft = useTripStore((state) => state.draft)
   const runReplan = useTripStore((state) => state.runReplan)
-  const adoptDraft = useTripStore((state) => state.adoptDraft)
   const discardDraft = useTripStore((state) => state.discardDraft)
   const [replanPanelOpen, setReplanPanelOpen] = useState(false)
   const [includeAlternatives, setIncludeAlternatives] = useState(false)
   const [showWarnings, setShowWarnings] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
-  // 草案全局只保留一份；只在与本日相关时显示
+  // 草案全局只保留一份；只在与本日相关时显示。
+  // compareOpen 控制"对比视图 vs 召回横幅"：返回编辑只收起视图，草案保留
   const dayDraft = draft && draft.day === day.date ? draft : null
+  const [compareOpen, setCompareOpen] = useState(true)
+  const dayDiff = useMemo(
+    () => (dayDraft ? buildDraftDiff(trip, dayDraft) : null),
+    [trip, dayDraft],
+  )
 
   const { startUtc, endUtc } = getTripDayWindow(trip, day.date)
   const rows = buildRows(day, startUtc, endUtc)
@@ -349,6 +356,7 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
               className="btn btn-accent"
               onClick={() => {
                 runReplan(day.date, now, includeAlternatives)
+                setCompareOpen(true)
                 setReplanPanelOpen(false)
               }}
             >
@@ -360,41 +368,49 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
           </div>
         </div>
       )}
-      {dayDraft && (
-        <div className="draft-card">
-          <div className="day-head">
-            <strong>重排草案</strong>
-            <span className="day-window">
-              {dayDraft.legs.length} 段新安排 · 取消 {dayDraft.cancelledPlaceIds.length} 项 ·
-              提示 {dayDraft.warnings.length} 条
-            </span>
-          </div>
-          {dayDraft.infeasibleReasons.length > 0 && (
+      {dayDraft !== null &&
+        dayDraft.legs.length === 0 &&
+        dayDraft.cancelledPlaceIds.length === 0 && (
+          <div className="draft-card">
+            <div className="day-head">
+              <strong>重排草案</strong>
+            </div>
             <ul className="warn-list">
               {dayDraft.infeasibleReasons.map((reason, index) => (
                 <li key={`reason-${index}`}>{reason}</li>
               ))}
             </ul>
-          )}
-          {dayDraft.warnings.length > 0 && (
-            <ul className="warn-list">
-              {dayDraft.warnings.map((warning, index) => (
-                <li key={`warning-${index}`}>{warning.message}</li>
-              ))}
-            </ul>
-          )}
-          {dayDraft.warnings.length === 0 && dayDraft.infeasibleReasons.length === 0 && (
-            <p className="day-empty">草案未产生警告，可直接采纳</p>
-          )}
-          <div className="day-actions">
-            <button type="button" className="btn btn-accent" onClick={adoptDraft}>
-              采纳草案
-            </button>
-            <button type="button" className="btn" onClick={discardDraft}>
-              放弃
-            </button>
+            <div className="day-actions">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => discardDraft()}
+              >
+                放弃
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+      {dayDraft && dayDiff !== null && compareOpen && (
+        <DraftCompare
+          trip={trip}
+          day={day}
+          draft={dayDraft}
+          now={now}
+          onCollapse={() => setCompareOpen(false)}
+        />
+      )}
+      {dayDraft && dayDiff !== null && !compareOpen && (
+        <button
+          type="button"
+          className="draft-recall"
+          onClick={() => setCompareOpen(true)}
+        >
+          <span>
+            有未确认的重排草案（{countDraftChanges(dayDiff)} 项变更）
+          </span>
+          <span className="draft-recall-arrow">查看对比 →</span>
+        </button>
       )}
     </section>
   )

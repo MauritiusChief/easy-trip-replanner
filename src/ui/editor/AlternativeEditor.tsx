@@ -72,9 +72,16 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
     existing?.fixedStart != null ? formatMinuteOfDay(existing.fixedStart) : '',
   )
   const [linkedId, setLinkedId] = useState(existing?.linkedPlaceId ?? '')
-  const [error, setError] = useState<string | null>(null)
+  // 错误关联到具体字段（阶段 4 可访问性）
+  const [error, setError] = useState<{ field: string; message: string } | null>(null)
 
   if (!day) return null
+
+  const fieldAria = (field: string) => ({
+    id: `ae-${field}`,
+    'aria-invalid': error?.field === field || undefined,
+    'aria-describedby': error !== null ? 'editor-form-error' : undefined,
+  })
 
   /**
    * 切换链接地点时，新建态且坐标仍是默认值的情况下，
@@ -93,45 +100,51 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
 
   const buildResult = ():
     | { ok: true; alternative: AlternativePlace }
-    | { ok: false; message: string } => {
+    | { ok: false; field: string; message: string } => {
     const trimmedName = name.trim()
-    if (trimmedName === '') return { ok: false, message: '名称不能为空' }
+    if (trimmedName === '') return { ok: false, field: 'name', message: '名称不能为空' }
     const parsedLat = parseCoordinate(lat, -90, 90)
-    if (parsedLat === undefined) return { ok: false, message: '纬度需在 -90 到 90 之间' }
+    if (parsedLat === undefined)
+      return { ok: false, field: 'lat', message: '纬度需在 -90 到 90 之间' }
     const parsedLng = parseCoordinate(lng, -180, 180)
-    if (parsedLng === undefined) return { ok: false, message: '经度需在 -180 到 180 之间' }
+    if (parsedLng === undefined)
+      return { ok: false, field: 'lng', message: '经度需在 -180 到 180 之间' }
     const parsedDuration = parseOptionalMinutes(duration)
     if (parsedDuration === undefined || parsedDuration === null) {
-      return { ok: false, message: '计划停留时长必须为正数分钟' }
+      return { ok: false, field: 'duration', message: '计划停留时长必须为正数分钟' }
     }
     const parsedOpen = parseTimeInput(openValue)
     if (openValue.trim() !== '' && parsedOpen === null) {
-      return { ok: false, message: '开放时间格式应为 HH:mm' }
+      return { ok: false, field: 'open', message: '开放时间格式应为 HH:mm' }
     }
     const parsedClose = parseTimeInput(closeValue)
     if (closeValue.trim() !== '' && parsedClose === null) {
-      return { ok: false, message: '关门时间格式应为 HH:mm' }
+      return { ok: false, field: 'close', message: '关门时间格式应为 HH:mm' }
     }
     if (parsedOpen !== null && parsedClose !== null && parsedOpen >= parsedClose) {
-      return { ok: false, message: '开放开始必须早于关门时间' }
+      return { ok: false, field: 'open', message: '开放开始必须早于关门时间' }
     }
     const parsedMinStay = parseOptionalMinutes(minStay)
-    if (parsedMinStay === undefined) return { ok: false, message: '最短停留需为正数分钟或留空' }
+    if (parsedMinStay === undefined)
+      return { ok: false, field: 'minStay', message: '最短停留需为正数分钟或留空' }
     const parsedMaxStay = parseOptionalMinutes(maxStay)
-    if (parsedMaxStay === undefined) return { ok: false, message: '最长停留需为正数分钟或留空' }
+    if (parsedMaxStay === undefined)
+      return { ok: false, field: 'maxStay', message: '最长停留需为正数分钟或留空' }
     if (
       parsedMinStay !== null &&
       parsedMaxStay !== null &&
       parsedMinStay > parsedMaxStay
     ) {
-      return { ok: false, message: '最短停留不能大于最长停留' }
+      return { ok: false, field: 'minStay', message: '最短停留不能大于最长停留' }
     }
     const parsedPriority = parsePriority(priority)
-    if (parsedPriority === undefined) return { ok: false, message: '优先级需为不小于 1 的整数' }
+    if (parsedPriority === undefined)
+      return { ok: false, field: 'priority', message: '优先级需为不小于 1 的整数' }
     let parsedFixed: MinuteOfDay | null = null
     if (fixedEnabled) {
       parsedFixed = parseTimeInput(fixedValue)
-      if (parsedFixed === null) return { ok: false, message: '固定开始时间格式应为 HH:mm' }
+      if (parsedFixed === null)
+        return { ok: false, field: 'fixed', message: '固定开始时间格式应为 HH:mm' }
     }
     return {
       ok: true,
@@ -157,7 +170,8 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
   const handleSave = () => {
     const result = buildResult()
     if (!result.ok) {
-      setError(result.message)
+      setError({ field: result.field, message: result.message })
+      document.getElementById(`ae-${result.field}`)?.focus()
       return
     }
     saveAlternative(dayKey, result.alternative)
@@ -173,12 +187,17 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
     <div className="editor-form">
       <label className="field">
         <span>名称</span>
-        <input value={name} onChange={(event) => setName(event.target.value)} />
+        <input
+          {...fieldAria('name')}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
       </label>
       <div className="field-grid">
         <label className="field">
           <span>纬度</span>
           <input
+            {...fieldAria('lat')}
             value={lat}
             inputMode="decimal"
             onChange={(event) => setLat(event.target.value)}
@@ -187,6 +206,7 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
         <label className="field">
           <span>经度</span>
           <input
+            {...fieldAria('lng')}
             value={lng}
             inputMode="decimal"
             onChange={(event) => setLng(event.target.value)}
@@ -197,6 +217,7 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
         <label className="field">
           <span>计划停留时长（分钟）</span>
           <input
+            {...fieldAria('duration')}
             value={duration}
             inputMode="numeric"
             onChange={(event) => setDuration(event.target.value)}
@@ -205,6 +226,7 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
         <label className="field">
           <span>优先级（1 最高）</span>
           <input
+            {...fieldAria('priority')}
             value={priority}
             inputMode="numeric"
             onChange={(event) => setPriority(event.target.value)}
@@ -215,6 +237,7 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
         <label className="field">
           <span>开放时间（留空不限）</span>
           <input
+            {...fieldAria('open')}
             type="time"
             value={openValue}
             onChange={(event) => setOpenValue(event.target.value)}
@@ -223,6 +246,7 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
         <label className="field">
           <span>关门时间（留空不限）</span>
           <input
+            {...fieldAria('close')}
             type="time"
             value={closeValue}
             onChange={(event) => setCloseValue(event.target.value)}
@@ -233,6 +257,7 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
         <label className="field">
           <span>最短停留（留空可取消）</span>
           <input
+            {...fieldAria('minStay')}
             value={minStay}
             inputMode="numeric"
             onChange={(event) => setMinStay(event.target.value)}
@@ -241,6 +266,7 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
         <label className="field">
           <span>最长停留（留空无上限）</span>
           <input
+            {...fieldAria('maxStay')}
             value={maxStay}
             inputMode="numeric"
             onChange={(event) => setMaxStay(event.target.value)}
@@ -258,6 +284,7 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
         </label>
         {fixedEnabled && (
           <input
+            {...fieldAria('fixed')}
             type="time"
             value={fixedValue}
             onChange={(event) => setFixedValue(event.target.value)}
@@ -282,8 +309,8 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
         />
       </div>
       {error !== null && (
-        <p className="sheet-error" role="alert">
-          {error}
+        <p className="sheet-error" id="editor-form-error" role="alert">
+          {error.message}
         </p>
       )}
       <div className="sheet-actions">

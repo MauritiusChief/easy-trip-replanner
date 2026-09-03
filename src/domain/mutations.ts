@@ -258,6 +258,48 @@ export function withAlternativeDeleted(
 }
 
 /**
+ * 用新行程段整体替换目标位置的段（阶段 4 逐项采纳）：
+ * - 地点与交通按草案写入（时间/时长/坐标快照以草案为准）
+ * - 写入后按开始时间重排行程段：草案可能调整地点顺序（需求 5.3），
+ *   逐项采纳时逐个写回原下标会让数组顺序与时间轴脱节，
+ *   进而让"当前位置推导"与警告检查基于错误的相邻关系
+ * - 若地点 id 发生变化（备选换入），同步新位置后一段交通的 from 快照，
+ *   并把备选库中链接到旧地点的条目置为"未连接"（与整份采纳语义一致）
+ */
+export function withLegReplaced(
+  trip: Trip,
+  dayKey: DateISO,
+  legIndex: number,
+  nextLeg: Leg,
+): Trip {
+  return mapDayFull(trip, dayKey, (day) => {
+    if (legIndex < 0 || legIndex >= day.legs.length) return day
+    const previousId = day.legs[legIndex].place.id
+    const idChanged = previousId !== nextLeg.place.id
+    const replaced = [...day.legs]
+    replaced[legIndex] = nextLeg
+    // 稳定排序：开始时间相同的段保持原相对顺序
+    replaced.sort((a, b) => a.place.start - b.place.start)
+    const newIndex = replaced.findIndex((leg) => leg.place.id === nextLeg.place.id)
+    const following = replaced[newIndex + 1]
+    if (idChanged && following?.transport) {
+      replaced[newIndex + 1] = {
+        ...following,
+        transport: { ...following.transport, from: nextLeg.place.location },
+      }
+    }
+    const alternatives = idChanged
+      ? day.alternatives.map((alternative) =>
+          alternative.linkedPlaceId === previousId
+            ? { ...alternative, linkedPlaceId: null }
+            : alternative,
+        )
+      : day.alternatives
+    return { ...day, legs: replaced, alternatives }
+  })
+}
+
+/**
  * 采纳重排草案：用草案段落替换目标日期 fromLegIndex 之后的行程，
  * 并同步备选库（需求 7）：
  * - 换入计划的备选 → 对应库条目移除（它已成为计划地点）

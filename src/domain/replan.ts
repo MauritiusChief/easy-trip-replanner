@@ -262,6 +262,7 @@ export function buildReplanDraft(
     warnings: emptyWarnings,
     infeasibleReasons: [reason],
     createdAt: Date.now(),
+    includeAlternatives,
   })
 
   const day = trip.days.find((entry) => entry.date === dayKey)
@@ -384,6 +385,8 @@ export function buildReplanDraft(
             warnings.push({
               kind: 'replan-note',
               day: dayKey,
+              // placeId 供草案对比视图把提示归属到"原地点 → 备选"条目
+              placeId: candidate.basePlaceId,
               message: `「${candidate.name}」无法安排，已替换为备选「${altCandidate.name}」`,
             })
             placed = true
@@ -400,6 +403,7 @@ export function buildReplanDraft(
       warnings.push({
         kind: 'replan-note',
         day: dayKey,
+        placeId: candidate.id,
         message: `「${candidate.name}」已取消（剩余时间不足）`,
       })
     } else {
@@ -407,12 +411,13 @@ export function buildReplanDraft(
     }
   }
 
-  // 压缩提示：实际停留短于原计划的段落
+  // 压缩提示：实际停留短于原计划的段落（placeId 供对比视图归属到条目）
   for (const placement of flexPlacements) {
     if (placement.durationMinutes < placement.candidate.currentDuration) {
       warnings.push({
         kind: 'min-stay',
         day: dayKey,
+        placeId: placement.candidate.id,
         message: `「${placement.candidate.name}」停留被压缩至 ${placement.durationMinutes} 分钟（原 ${placement.candidate.currentDuration} 分钟）`,
       })
     }
@@ -460,13 +465,24 @@ export function buildReplanDraft(
   const fullLegs = [...prefixLegs, ...draftLegs]
   const genericWarnings = collectDayWarnings(trip, { ...day, legs: fullLegs })
 
+  // 引擎自身提示没有 legIndex：按 placeId 补上草案段下标（换算为完整时间轴下标），
+  // 使所有警告都能被"按段归属"消费
+  const locatedWarnings = [...warnings, ...genericWarnings].map((warning) => {
+    if (warning.legIndex !== undefined || warning.placeId === undefined) return warning
+    const draftIndex = draftLegs.findIndex((leg) => leg.place.id === warning.placeId)
+    return draftIndex >= 0
+      ? { ...warning, legIndex: prefixCount + draftIndex }
+      : warning
+  })
+
   return {
     day: dayKey,
     fromLegIndex: prefixCount,
     legs: draftLegs,
     cancelledPlaceIds,
-    warnings: [...warnings, ...genericWarnings],
+    warnings: locatedWarnings,
     infeasibleReasons,
     createdAt: Date.now(),
+    includeAlternatives,
   }
 }
