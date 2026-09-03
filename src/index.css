@@ -4,21 +4,27 @@
  */
 
 :root {
-  --bg: #f6f5f2;
-  --card: #ffffff;
+  /* ===== 中性层级令牌：视觉层级由排版、间距与边框承载 ===== */
+  --bg: #f6f5f2; /* 页面背景 */
+  --card: #ffffff; /* 表面（卡片、抽屉、悬浮层内容） */
+  --overlay: rgba(8, 6, 13, 0.45); /* 悬浮层遮罩 */
   --text: #2a2733;
   --text-soft: #6b6375;
   --text-h: #08060d;
   --border: #e5e4e7;
-  --accent: #7c5cff;
-  --accent-soft: rgba(124, 92, 255, 0.1);
-  --accent-border: rgba(124, 92, 255, 0.45);
+  /* 强调边框（中性加深）："今天"、打开态、主操作按钮 */
+  --border-strong: #a9a3b3;
+
+  /* ===== 功能状态令牌：必须始终搭配文字、图标或边框，不做装饰用途 ===== */
+  --focus: #2563eb; /* 焦点轮廓与"当前位置/当前操作"标识 */
+  --focus-ring: rgba(37, 99, 235, 0.22);
+  --warning-bg: #fff4e5; /* 规划警告与存储失败提示 */
+  --warning-text: #8a5300;
+  --warning-border: #ffd699;
+  --danger-text: #b42318; /* 输入错误与破坏性操作 */
+
   --chip-bg: rgba(42, 39, 51, 0.06);
   --gap-bg: rgba(42, 39, 51, 0.03);
-  --notice-bg: #fff4e5;
-  --notice-text: #8a5300;
-  --notice-border: #ffd699;
-  --fixed-text: #b45309;
   --shadow: rgba(0, 0, 0, 0.08) 0 4px 12px -4px;
 
   --sans: system-ui, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Roboto,
@@ -39,19 +45,20 @@
   :root {
     --bg: #16171d;
     --card: #1f2028;
+    --overlay: rgba(0, 0, 0, 0.6);
     --text: #c9c6d4;
     --text-soft: #9ca3af;
     --text-h: #f3f4f6;
     --border: #2e303a;
-    --accent: #a78bfa;
-    --accent-soft: rgba(167, 139, 250, 0.14);
-    --accent-border: rgba(167, 139, 250, 0.5);
+    --border-strong: #7a7486;
+    --focus: #93c5fd;
+    --focus-ring: rgba(147, 197, 253, 0.3);
+    --warning-bg: #3a2c14;
+    --warning-text: #fbbf24;
+    --warning-border: #6b511f;
+    --danger-text: #f87171;
     --chip-bg: rgba(243, 244, 246, 0.08);
     --gap-bg: rgba(243, 244, 246, 0.04);
-    --notice-bg: #3a2c14;
-    --notice-text: #fbbf24;
-    --notice-border: #6b511f;
-    --fixed-text: #fbbf24;
     --shadow: rgba(0, 0, 0, 0.4) 0 6px 16px -6px;
   }
 }
@@ -60,9 +67,9 @@
   box-sizing: border-box;
 }
 
-/* 键盘可见焦点（阶段 4 可访问性）：仅键盘导航时显示，不干扰鼠标点击 */
+/* 键盘可见焦点（功能状态）：仅键盘导航时显示，不干扰鼠标点击 */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -103,9 +110,9 @@ p {
 
 .notice {
   margin-top: 12px;
-  background: var(--notice-bg);
-  color: var(--notice-text);
-  border: 1px solid var(--notice-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 14px;
@@ -140,15 +147,15 @@ p {
 }
 
 .btn:active {
-  border-color: var(--accent);
+  border-color: var(--border-strong);
 }
 
-.btn-accent {
-  border-color: var(--accent-border);
-  color: var(--accent);
+/* 主操作按钮：以边框加深与字重区分，不做装饰性着色 */
+.btn-primary {
+  border-color: var(--border-strong);
   font-weight: 600;
 }
 
 .btn-danger {
-  color: var(--notice-text);
+  color: var(--danger-text);
 }

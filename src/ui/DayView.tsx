@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { MS_PER_MINUTE } from '../domain/config'
 import type { CurrentPosition } from '../domain/current'
 import { getTripDayWindow } from '../domain/current'
-import { countDraftChanges, buildDraftDiff } from '../domain/draftDiff'
 import { collectDayWarnings } from '../domain/warnings'
 import {
   dayKeyToLabel,
@@ -12,7 +11,7 @@ import {
 } from '../domain/time'
 import type { DateISO, DayPlan, EpochMs, Leg, Trip } from '../domain/types'
 import { useTripStore } from '../state/tripStore'
-import { DraftCompare } from './DraftCompare'
+import { ReorderPanel } from './ReorderPanel'
 import './DayView.css'
 
 /**
@@ -101,27 +100,16 @@ function PlaceMeta({ leg }: { leg: Leg }) {
  * - 地点/交通行可点击进入对应编辑表单（需求 8.2）
  * - 卡片头部显示警告徽标（可展开明细）与"备选库"入口（需求 7），
  *   库以堆叠卡片形式展示，不是时间轴
- * - 底部提供"添加地点"与"重排当天剩余行程"入口（需求 8.3）
+ * - 底部提供"添加地点"与"开始手动重排"入口（需求 8.3），
+ *   手动重排的待选卡槽与即时保存在 ReorderPanel 中
  */
 export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
   const timeZone = trip.timezone
   const openEditor = useTripStore((state) => state.openEditor)
   const insertPlace = useTripStore((state) => state.insertPlace)
-  const draft = useTripStore((state) => state.draft)
-  const runReplan = useTripStore((state) => state.runReplan)
-  const discardDraft = useTripStore((state) => state.discardDraft)
-  const [replanPanelOpen, setReplanPanelOpen] = useState(false)
-  const [includeAlternatives, setIncludeAlternatives] = useState(false)
+  const startReorder = useTripStore((state) => state.startReorder)
   const [showWarnings, setShowWarnings] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
-  // 草案全局只保留一份；只在与本日相关时显示。
-  // compareOpen 控制"对比视图 vs 召回横幅"：返回编辑只收起视图，草案保留
-  const dayDraft = draft && draft.day === day.date ? draft : null
-  const [compareOpen, setCompareOpen] = useState(true)
-  const dayDiff = useMemo(
-    () => (dayDraft ? buildDraftDiff(trip, dayDraft) : null),
-    [trip, dayDraft],
-  )
 
   const { startUtc, endUtc } = getTripDayWindow(trip, day.date)
   const rows = buildRows(day, startUtc, endUtc)
@@ -328,90 +316,19 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
           })}
         </div>
       )}
+      <ReorderPanel trip={trip} day={day} />
       <div className="day-actions">
         <button type="button" className="btn" onClick={() => insertPlace(day.date, null)}>
           ＋ 添加地点
         </button>
         <button
           type="button"
-          className={warnings.length > 0 ? 'btn btn-accent' : 'btn'}
-          onClick={() => setReplanPanelOpen((open) => !open)}
+          className="btn"
+          onClick={() => startReorder(day.date, now)}
         >
-          重排当天剩余行程
+          开始手动重排
         </button>
       </div>
-      {replanPanelOpen && !dayDraft && (
-        <div className="replan-panel">
-          <label className="field-check">
-            <input
-              type="checkbox"
-              checked={includeAlternatives}
-              onChange={(event) => setIncludeAlternatives(event.target.checked)}
-            />
-            <span>纳入备选地点（原地点排不下时作为替代，需求 7.3）</span>
-          </label>
-          <div className="day-actions">
-            <button
-              type="button"
-              className="btn btn-accent"
-              onClick={() => {
-                runReplan(day.date, now, includeAlternatives)
-                setCompareOpen(true)
-                setReplanPanelOpen(false)
-              }}
-            >
-              开始重排
-            </button>
-            <button type="button" className="btn" onClick={() => setReplanPanelOpen(false)}>
-              取消
-            </button>
-          </div>
-        </div>
-      )}
-      {dayDraft !== null &&
-        dayDraft.legs.length === 0 &&
-        dayDraft.cancelledPlaceIds.length === 0 && (
-          <div className="draft-card">
-            <div className="day-head">
-              <strong>重排草案</strong>
-            </div>
-            <ul className="warn-list">
-              {dayDraft.infeasibleReasons.map((reason, index) => (
-                <li key={`reason-${index}`}>{reason}</li>
-              ))}
-            </ul>
-            <div className="day-actions">
-              <button
-                type="button"
-                className="btn"
-                onClick={() => discardDraft()}
-              >
-                放弃
-              </button>
-            </div>
-          </div>
-        )}
-      {dayDraft && dayDiff !== null && compareOpen && (
-        <DraftCompare
-          trip={trip}
-          day={day}
-          draft={dayDraft}
-          now={now}
-          onCollapse={() => setCompareOpen(false)}
-        />
-      )}
-      {dayDraft && dayDiff !== null && !compareOpen && (
-        <button
-          type="button"
-          className="draft-recall"
-          onClick={() => setCompareOpen(true)}
-        >
-          <span>
-            有未确认的重排草案（{countDraftChanges(dayDiff)} 项变更）
-          </span>
-          <span className="draft-recall-arrow">查看对比 →</span>
-        </button>
-      )}
     </section>
   )
 }

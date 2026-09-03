@@ -1,0 +1,171 @@
+/* 手动重排面板（ReorderPanel）：待选卡槽、参考信息、即时保存表单。
+   移动端优先：卡槽、参考信息、输入与操作在窄屏下单列、可点面积充足。 */
+
+.reorder-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+}
+
+.reorder-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reorder-title {
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+.reorder-note {
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.reorder-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reorder-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+/* 展开的卡片 = 当前操作：焦点色描边 + 光环（与时间轴 is-current 一致） */
+.reorder-card.is-open {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+/* 收起状态的待选卡是整卡可点的按钮（触屏易点击） */
+.reorder-card-btn {
+  font: inherit;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.reorder-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.reorder-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.reorder-card-time {
+  font-size: 13px;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.reorder-card-refs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.reorder-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.reorder-chip {
+  background: var(--chip-bg);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.reorder-chip-cancellable {
+  background: transparent;
+  border: 1px dashed var(--border);
+}
+
+/* 展开状态的填写表单 */
+.reorder-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
+}
+
+.reorder-form-hint {
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.reorder-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.reorder-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.reorder-field input {
+  font: inherit;
+  min-height: 40px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+}
+
+.reorder-error {
+  font-size: 12px;
+  color: var(--danger-text);
+}
+
+.reorder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 触屏设备放大输入与操作目标 */
+@media (pointer: coarse) {
+  .reorder-field input {
+    min-height: 44px;
+  }
+}
+
+@media (min-width: 480px) {
+  .reorder-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

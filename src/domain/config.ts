@@ -34,13 +34,6 @@ export const DETOUR_EXTRA_KM = 1
  */
 export const SPEED_ANOMALY_RATIO = 0.4
 
-/**
- * 路线优化搜索上限（阶段 3 使用）：
- * 可调整区间内地点数不超过此值时尝试精确排列搜索，
- * 超过则退化为贪心近邻策略，控制计算量。
- */
-export const ROUTE_EXACT_MAX_PLACES = 8
-
 /** 示例行程使用的时区（东京），便于演示真实坐标与固定预约场景。 */
 export const DEFAULT_SAMPLE_TIMEZONE = 'Asia/Tokyo'
 

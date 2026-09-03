@@ -4,7 +4,7 @@
   position: fixed;
   inset: 0;
   z-index: 30;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--overlay);
 }
 
 .sheet {
@@ -106,7 +106,7 @@
 .sheet-error {
   margin: 0;
   font-size: 13px;
-  color: var(--notice-text);
+  color: var(--danger-text);
 }
 
 .editor-info {

@@ -157,9 +157,8 @@ export interface Trip {
  * - missing-transport：地点缺少到达交通
  * - out-of-window：超出每日可规划窗口
  * - fixed-conflict：违反固定开始时间锚点
- * - min-stay：停留低于最短时长（含重排压缩提示）
+ * - min-stay：停留低于最短时长
  * - storage-invalid：本地存储数据无效
- * - replan-note：重排引擎的说明性提示（取消/替换等）
  */
 export type WarningKind =
   | 'detour'
@@ -171,34 +170,11 @@ export type WarningKind =
   | 'fixed-conflict'
   | 'min-stay'
   | 'storage-invalid'
-  | 'replan-note'
 
 /** 一条面向用户的规划警告，可关联到某天某段行程。 */
 export interface PlanWarning {
   kind: WarningKind
   day: DateISO
   legIndex?: number
-  /** 关联的地点 id（重排引擎的取消/压缩/替换提示使用），供草案对比按条目归属。 */
-  placeId?: PlaceId
   message: string
-}
-
-/**
- * 重排草案（阶段 3 产物）：只替换目标日期 fromLegIndex 之后的行程，
- * 并同步该日备选库（换入条目移除、悬空链接置空），
- * 在用户确认前绝不写入正式计划（需求 1.2）。
- */
-export interface ReplanDraft {
-  day: DateISO
-  fromLegIndex: number
-  /** 草案行程段（含取消项的最终排程结果）。 */
-  legs: Leg[]
-  /** 本次重排中被取消的地点 id。 */
-  cancelledPlaceIds: PlaceId[]
-  warnings: PlanWarning[]
-  /** 无法满足硬约束时的原因说明。 */
-  infeasibleReasons: string[]
-  createdAt: EpochMs
-  /** 生成草案时的"纳入备选地点"开关；逐项采纳后重建草案需要沿用同一参数。 */
-  includeAlternatives: boolean
 }

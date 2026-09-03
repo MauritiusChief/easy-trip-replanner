@@ -3,31 +3,37 @@ import { loadTrip, saveTrip } from '../data/storage'
 import {
   withAlternativeDeleted,
   withAlternativeSaved,
-  withDraftAdopted,
-  withLegReplaced,
   withPlaceDeleted,
   withPlaceInserted,
   withPlaceSaved,
   withTransportDuration,
 } from '../domain/mutations'
-import { buildDraftDiff, countDraftChanges } from '../domain/draftDiff'
-import { buildReplanDraft } from '../domain/replan'
+import {
+  resolveSessionPredecessor,
+  startManualReorderSession,
+  withCurrentCard,
+  withManualReorderSaved,
+  withPlaceProcessed,
+} from '../domain/manualReorder'
 import type {
   AlternativePlace,
   DateISO,
   EpochMs,
   PlaceId,
   PlaceSlot,
-  ReplanDraft,
   Trip,
 } from '../domain/types'
-import type { DraftDiffItem } from '../domain/draftDiff'
+import type {
+  ManualReorderSave,
+  ManualReorderSession,
+} from '../domain/manualReorder'
 
 /**
- * 全局状态（阶段 2 引入 zustand，阶段 3 扩展重排草案与备选库）：
+ * 全局状态：
  * - trip：唯一主要状态，任何变更经 mutations 纯函数生成新引用并自动持久化
  * - editor：当前打开的编辑器（临时 UI 状态，不持久化）
- * - draft：重排引擎产出的草案（临时状态，未采纳绝不写入 trip，不持久化）
+ * - reorderSession：手动重排会话（仅内存，不持久化；
+ *   退出仅关闭 UI，已保存的调整已即时写入 trip）
  * - resetReason / saveFailed：数据加载与持久化的用户提示
  */
 
@@ -42,10 +48,14 @@ export interface TripStore {
   resetReason: string | null
   saveFailed: boolean
   editor: EditorSelection | null
-  draft: ReplanDraft | null
+  /**
+   * 手动重排会话（仅内存，不持久化）：
+   * null 表示未在进行手动重排；会话只属于启动时的那一天。
+   */
+  reorderSession: ManualReorderSession | null
   openEditor: (selection: EditorSelection) => void
   closeEditor: () => void
-  /** 保存地点编辑，保存后关闭编辑器；编辑会使草案过期，一并清除。 */
+  /** 保存地点编辑，保存后关闭编辑器。 */
   savePlaceEdit: (dayKey: DateISO, legIndex: number, place: PlaceSlot) => void
   /** 保存交通时长编辑（基准速度按新时长重算），保存后关闭编辑器。 */
   saveTransportEdit: (
@@ -61,18 +71,16 @@ export interface TripStore {
   insertPlace: (dayKey: DateISO, afterLegIndex: number | null) => void
   /** 删除地点。 */
   deletePlace: (dayKey: DateISO, legIndex: number) => void
-  /** 触发当天剩余行程的重排，生成草案（不直接修改计划）。 */
-  runReplan: (dayKey: DateISO, now: EpochMs, includeAlternatives: boolean) => void
-  /**
-   * 逐项采纳（阶段 4）：把对比视图中的一个变更条目写入正式计划，
-   * 然后按原参数重建草案——草案始终基于当前计划状态（需求 5.1），
-   * 剩余条目会随新状态刷新；重建后若无实质变化则草案清除。
-   */
-  applyDraftItem: (item: DraftDiffItem, now: EpochMs) => void
-  /** 采纳草案：替换目标日期的剩余行程，草案清除。 */
-  adoptDraft: () => void
-  /** 放弃草案。 */
-  discardDraft: () => void
+  /** 开始手动重排：为指定日期构建会话（当天没有待选地点时不开启）。 */
+  startReorder: (dayKey: DateISO, now: EpochMs) => void
+  /** 打开一张待选卡的输入界面。 */
+  openReorderCard: (placeId: PlaceId) => void
+  /** 关闭当前卡的输入界面（不退出会话）。 */
+  closeReorderCard: () => void
+  /** 保存当前卡：原子写入正式行程并标记已处理，时间轴与警告即时刷新。 */
+  saveReorderCard: (save: ManualReorderSave) => void
+  /** 退出手动重排：仅关闭会话 UI，已保存的变更不回滚。 */
+  exitReorder: () => void
 }
 
 const initial = loadTrip()
@@ -82,90 +90,67 @@ export const useTripStore = create<TripStore>()((set) => ({
   resetReason: initial.resetReason,
   saveFailed: false,
   editor: null,
-  draft: null,
+  reorderSession: null,
   openEditor: (selection) => set({ editor: selection }),
   closeEditor: () => set({ editor: null }),
   savePlaceEdit: (dayKey, legIndex, place) =>
     set((state) => ({
       trip: withPlaceSaved(state.trip, dayKey, legIndex, place),
       editor: null,
-      draft: null,
     })),
   saveTransportEdit: (dayKey, legIndex, durationMinutes) =>
     set((state) => ({
       trip: withTransportDuration(state.trip, dayKey, legIndex, durationMinutes),
       editor: null,
-      draft: null,
     })),
   saveAlternative: (dayKey, alternative) =>
     set((state) => ({
       trip: withAlternativeSaved(state.trip, dayKey, alternative),
       editor: null,
-      draft: null,
     })),
   deleteAlternative: (dayKey, altId) =>
     set((state) => ({
       trip: withAlternativeDeleted(state.trip, dayKey, altId),
       editor: null,
-      draft: null,
     })),
   insertPlace: (dayKey, afterLegIndex) =>
     set((state) => ({
       trip: withPlaceInserted(state.trip, dayKey, afterLegIndex),
       editor: null,
-      draft: null,
     })),
   deletePlace: (dayKey, legIndex) =>
     set((state) => ({
       trip: withPlaceDeleted(state.trip, dayKey, legIndex),
       editor: null,
-      draft: null,
     })),
-  runReplan: (dayKey, now, includeAlternatives) =>
+  startReorder: (dayKey, now) =>
     set((state) => ({
-      draft: buildReplanDraft(state.trip, dayKey, now, includeAlternatives),
+      // 会话全局只保留一份：在其他日期再次开始会替换旧会话
+      reorderSession: startManualReorderSession(state.trip, dayKey, now),
     })),
-  applyDraftItem: (item, now) =>
+  openReorderCard: (placeId) =>
+    set((state) => ({
+      reorderSession: state.reorderSession
+        ? withCurrentCard(state.reorderSession, placeId)
+        : null,
+    })),
+  closeReorderCard: () =>
+    set((state) => ({
+      reorderSession: state.reorderSession
+        ? withCurrentCard(state.reorderSession, null)
+        : null,
+    })),
+  saveReorderCard: (save) =>
     set((state) => {
-      const draft = state.draft
-      if (!draft) return {}
-      // 变更条目都以"原计划剩余区中的位置"为写入目标；
-      // 纯换入段（无原地点，防御分支）没有落点，忽略
-      if (item.originalIndex === null) return {}
-      const absIndex = draft.fromLegIndex + item.originalIndex
-      const day = state.trip.days.find((entry) => entry.date === draft.day)
-      if (!day || absIndex >= day.legs.length) return { draft: null }
-      const trip =
-        item.kind === 'cancelled'
-          ? withPlaceDeleted(state.trip, draft.day, absIndex)
-          : item.draftLeg !== null
-            ? withLegReplaced(state.trip, draft.day, absIndex, item.draftLeg)
-            : state.trip
-      if (trip === state.trip) return {}
-      // 按原参数重建：剩余条目基于新计划重新排程，保持草案连贯。
-      // 重建出"无可排内容"的失败草案（或已无实质变化）时直接清除草案
-      const next = buildReplanDraft(trip, draft.day, now, draft.includeAlternatives)
-      const failed =
-        next.legs.length === 0 && next.cancelledPlaceIds.length === 0
-      const diff = failed ? null : buildDraftDiff(trip, next)
+      const session = state.reorderSession
+      if (!session) return {}
+      const predecessor = resolveSessionPredecessor(state.trip, session)
       return {
-        trip,
-        draft:
-          failed ||
-          (diff !== null &&
-            countDraftChanges(diff) === 0 &&
-            next.infeasibleReasons.length === 0)
-            ? null
-            : next,
+        trip: withManualReorderSaved(state.trip, session.dayKey, save, predecessor),
+        reorderSession: withPlaceProcessed(session, save.placeId),
       }
     }),
-  adoptDraft: () =>
-    set((state) =>
-      state.draft
-        ? { trip: withDraftAdopted(state.trip, state.draft), draft: null }
-        : {},
-    ),
-  discardDraft: () => set({ draft: null }),
+  exitReorder: () => set({ reorderSession: null }),
 }))
 
 // 自动持久化：trip 引用变化即写盘（需求 10.1 客户端存储）。

@@ -291,7 +291,7 @@ export function PlaceEditor({ dayKey, legIndex }: PlaceEditorProps) {
         </p>
       )}
       <div className="sheet-actions">
-        <button type="button" className="btn btn-accent" onClick={handleSave}>
+        <button type="button" className="btn btn-primary" onClick={handleSave}>
           保存
         </button>
         <button type="button" className="btn" onClick={closeEditor}>

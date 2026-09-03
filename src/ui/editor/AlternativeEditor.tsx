@@ -314,7 +314,7 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
         </p>
       )}
       <div className="sheet-actions">
-        <button type="button" className="btn btn-accent" onClick={handleSave}>
+        <button type="button" className="btn btn-primary" onClick={handleSave}>
           保存
         </button>
         <button type="button" className="btn" onClick={closeEditor}>
@@ -327,7 +327,7 @@ export function AlternativeEditor({ dayKey, altId }: AlternativeEditorProps) {
         )}
       </div>
       <p className="sheet-hint">
-        时区：{timeZone}；备选不参与时间轴，仅在重排并勾选"纳入备选地点"时作为替代候选
+        时区：{timeZone}；备选不参与时间轴，需要时通过"添加地点"手动加入计划
       </p>
     </div>
   )

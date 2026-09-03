@@ -68,7 +68,7 @@ export interface ReorderScope {
 
 /**
  * R1 的整日版本：把当天行程切成锁定前缀、锚点和待选三部分。
- * 前缀推导与自动重排 resolvePrefix 的语义一致（重构阶段 1 复用该语义）：
+ * 前缀推导语义（与各处"当前位置"扫描一致）：
  * done = 停留已结束；active = now 落在交通或停留区间内；
  * 前缀长度 = max(连续 done 数, active 下标 + 1)。
  */
