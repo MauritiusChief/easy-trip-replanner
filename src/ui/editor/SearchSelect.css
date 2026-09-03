@@ -1,0 +1,48 @@
+/* 可搜索下拉（SearchSelect）：输入框沿用 .field input 样式，列表在文档流内展开 */
+
+.search-select {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 列表不绝对定位：底部抽屉是滚动容器，文档流内展开可避免裁剪与屏幕溢出 */
+.search-select-list {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.search-select-item {
+  font: inherit;
+  width: 100%;
+  min-height: 36px;
+  text-align: left;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.search-select-item.is-active {
+  background: var(--chip-bg);
+}
+
+/* 已选项以字重与文字加深表达，不做装饰性着色 */
+.search-select-item.is-selected {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.search-select-empty {
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text-soft);
+}

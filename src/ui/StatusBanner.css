@@ -1,0 +1,16 @@
+/* 状态横幅（StatusBanner）：吸附在页面顶部，展示"此刻应该在哪儿"。
+   中性表面 + 强调边框承载层级，文案本身表达状态。 */
+
+.status-banner {
+  position: sticky;
+  top: 8px;
+  z-index: 10;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
