@@ -32,6 +32,7 @@ export function PlaceEditor({ dayKey, legIndex }: PlaceEditorProps) {
   const trip = useTripStore((state) => state.trip)
   const savePlaceEdit = useTripStore((state) => state.savePlaceEdit)
   const insertPlace = useTripStore((state) => state.insertPlace)
+  const insertTransport = useTripStore((state) => state.insertTransport)
   const deletePlace = useTripStore((state) => state.deletePlace)
   const closeEditor = useTripStore((state) => state.closeEditor)
 
@@ -300,6 +301,11 @@ export function PlaceEditor({ dayKey, legIndex }: PlaceEditorProps) {
         <button type="button" className="btn" onClick={() => insertPlace(dayKey, legIndex)}>
           在此后插入
         </button>
+        {legIndex > 0 && !leg.transport && (
+          <button type="button" className="btn" onClick={() => insertTransport(dayKey, legIndex)}>
+            在此前插入交通
+          </button>
+        )}
         <button type="button" className="btn btn-danger" onClick={handleDelete}>
           删除地点
         </button>

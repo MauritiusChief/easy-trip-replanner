@@ -19,6 +19,7 @@ interface TransportEditorProps {
 export function TransportEditor({ dayKey, legIndex }: TransportEditorProps) {
   const trip = useTripStore((state) => state.trip)
   const saveTransportEdit = useTripStore((state) => state.saveTransportEdit)
+  const deleteTransport = useTripStore((state) => state.deleteTransport)
   const closeEditor = useTripStore((state) => state.closeEditor)
 
   const leg = findLeg(trip, dayKey, legIndex)
@@ -56,6 +57,12 @@ export function TransportEditor({ dayKey, legIndex }: TransportEditorProps) {
     )
   }
 
+  const handleDelete = () => {
+    if (window.confirm(`删除前往「${leg.place.name}」的交通？`)) {
+      deleteTransport(dayKey, legIndex)
+    }
+  }
+
   return (
     <div className="editor-form">
       <p className="editor-info">
@@ -90,6 +97,9 @@ export function TransportEditor({ dayKey, legIndex }: TransportEditorProps) {
         </button>
         <button type="button" className="btn" onClick={closeEditor}>
           取消
+        </button>
+        <button type="button" className="btn btn-danger" onClick={handleDelete}>
+          删除交通
         </button>
       </div>
     </div>
