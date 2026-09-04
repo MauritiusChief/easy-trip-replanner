@@ -9,19 +9,12 @@ import {
   formatMinuteOfDay,
   formatZonedTime,
 } from '../domain/time'
+import type { CSSProperties } from 'react'
 import type { DateISO, DayPlan, EpochMs, Leg, Trip } from '../domain/types'
 import { useTripStore } from '../state/tripStore'
+import { buildDayRows, getSlotHeightSteps } from './dayRows'
 import { ReorderPanel } from './ReorderPanel'
 import './DayView.css'
-
-/**
- * 日卡片内的一行渲染单元。
- * gap 行不是存储数据，而是由相邻 slot 之间的缝隙推导出来的展示元素。
- */
-type Row =
-  | { kind: 'gap'; key: string; startUtc: EpochMs; endUtc: EpochMs }
-  | { kind: 'transport'; key: string; legIndex: number }
-  | { kind: 'place'; key: string; legIndex: number }
 
 interface DayViewProps {
   trip: Trip
@@ -33,34 +26,10 @@ interface DayViewProps {
   position: CurrentPosition
 }
 
-/**
- * 把一天的行程段展开为渲染行，并在缝隙处插入空档行：
- * - 有交通的行程段：若交通晚于前序结束时间 → 先插空档，再渲染交通
- * - 停留开始晚于交通到达（固定锚点前的集合缓冲）→ 再插一段空档
- * - 窗口末尾未排满 → 追加尾部空档
- * cursor 始终指向"已渲染行程的结束时刻"。
- */
-function buildRows(day: DayPlan, startUtc: EpochMs, endUtc: EpochMs): Row[] {
-  const rows: Row[] = []
-  let cursor = startUtc
-  day.legs.forEach((leg, legIndex) => {
-    if (leg.transport) {
-      if (leg.transport.start > cursor) {
-        rows.push({ kind: 'gap', key: `gap-t-${legIndex}`, startUtc: cursor, endUtc: leg.transport.start })
-      }
-      rows.push({ kind: 'transport', key: `transport-${legIndex}`, legIndex })
-      cursor = leg.transport.start + leg.transport.durationMinutes * MS_PER_MINUTE
-    }
-    if (leg.place.start > cursor) {
-      rows.push({ kind: 'gap', key: `gap-p-${legIndex}`, startUtc: cursor, endUtc: leg.place.start })
-    }
-    rows.push({ kind: 'place', key: `place-${legIndex}`, legIndex })
-    cursor = Math.max(cursor, leg.place.start + leg.place.durationMinutes * MS_PER_MINUTE)
-  })
-  if (cursor < endUtc) {
-    rows.push({ kind: 'gap', key: 'gap-end', startUtc: cursor, endUtc })
-  }
-  return rows
+function slotHeightStyle(durationMinutes: number): CSSProperties {
+  return {
+    '--slot-height-steps': getSlotHeightSteps(durationMinutes),
+  } as CSSProperties
 }
 
 /**
@@ -113,7 +82,7 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
   const [libraryOpen, setLibraryOpen] = useState(false)
 
   const { startUtc, endUtc } = getTripDayWindow(trip, day.date)
-  const rows = buildRows(day, startUtc, endUtc)
+  const rows = buildDayRows(day, startUtc, endUtc)
   const warnings = useMemo(() => collectDayWarnings(trip, day), [trip, day])
   // 时间重叠涉及的行程段：给对应 slot 加警告样式（冲突状态，配"⚠ 时间重叠"徽标）
   const overlapLegs = useMemo(
@@ -241,7 +210,7 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
           ))}
         </ul>
       )}
-      {day.legs.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="day-empty">当日暂无安排</p>
       ) : (
         <div className="slot-list">
@@ -257,6 +226,7 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
                 <div
                   key={row.key}
                   className={isCurrentGap ? 'slot slot-gap is-current' : 'slot slot-gap'}
+                  style={slotHeightStyle((row.endUtc - row.startUtc) / MS_PER_MINUTE)}
                 >
                   <span className="slot-time">
                     {formatZonedTime(row.startUtc, timeZone)}–
@@ -285,6 +255,7 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
                   key={row.key}
                   type="button"
                   className={className}
+                  style={slotHeightStyle(transport.durationMinutes)}
                   aria-label={`编辑前往 ${leg.place.name} 的交通`}
                   onClick={() =>
                     openEditor({ type: 'transport', dayKey: day.date, legIndex: row.legIndex })
@@ -313,6 +284,7 @@ export function DayView({ trip, day, now, todayKey, position }: DayViewProps) {
                 key={row.key}
                 type="button"
                 className={className}
+                style={slotHeightStyle(leg.place.durationMinutes)}
                 aria-label={`编辑 ${leg.place.name}`}
                 onClick={() =>
                   openEditor({ type: 'place', dayKey: day.date, legIndex: row.legIndex })

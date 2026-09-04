@@ -57,18 +57,22 @@
 }
 
 .slot-list {
+  /* 每 15 分钟对应的最小卡片高度；可在查看实际效果后直接调整此值。 */
+  --slot-height-per-15-minutes: 24px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
 .slot {
+  --slot-height-steps: 1;
   display: flex;
   flex-direction: column;
   gap: 6px;
   border-radius: 10px;
   padding: 10px 12px;
   border: 2px solid transparent;
+  min-height: calc(var(--slot-height-steps) * var(--slot-height-per-15-minutes));
 }
 
 /* 地点/交通行是可点击按钮，重置按钮默认外观 */
