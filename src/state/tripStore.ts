@@ -60,6 +60,8 @@ export interface TripStore {
   reorderSession: ManualReorderSession | null
   openEditor: (selection: EditorSelection) => void
   closeEditor: () => void
+  /** 用已校验的完整行程替换当前数据，并清理关联旧行程的临时 UI 状态。 */
+  replaceTrip: (trip: Trip) => void
   /** 保存行程级设置（名称/时区/日期范围/每日窗口），保存后关闭编辑器。 */
   saveTripSettings: (settings: TripSettings) => void
   /** 保存地点编辑，保存后关闭编辑器。 */
@@ -104,6 +106,14 @@ export const useTripStore = create<TripStore>()((set) => ({
   reorderSession: null,
   openEditor: (selection) => set({ editor: selection }),
   closeEditor: () => set({ editor: null }),
+  replaceTrip: (trip) =>
+    set({
+      trip,
+      editor: null,
+      reorderSession: null,
+      resetReason: null,
+      saveFailed: false,
+    }),
   saveTripSettings: (settings) =>
     set((state) => ({
       trip: withTripSettingsSaved(state.trip, settings),

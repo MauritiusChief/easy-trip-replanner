@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { type ChangeEvent, useRef, useState } from 'react'
+import { exportTripJson, getTripExportFilename, importTripJson } from '../../data/transfer'
 import { TIME_STEP_MINUTES } from '../../domain/config'
 import { isValidTimeZone } from '../../domain/time'
 import { roundMinutesToStep } from '../../domain/time'
@@ -16,7 +17,9 @@ import { parseTimeInput } from './formUtils'
 export function TripEditor() {
   const trip = useTripStore((state) => state.trip)
   const saveTripSettings = useTripStore((state) => state.saveTripSettings)
+  const replaceTrip = useTripStore((state) => state.replaceTrip)
   const closeEditor = useTripStore((state) => state.closeEditor)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const [name, setName] = useState(trip.name)
   const [timezone, setTimezone] = useState(trip.timezone)
@@ -104,6 +107,41 @@ export function TripEditor() {
     })
   }
 
+  const handleExport = () => {
+    const blob = new Blob([exportTripJson(trip)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = getTripExportFilename(trip.name)
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+
+  const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget
+    const file = input.files?.[0]
+    input.value = ''
+    if (!file) return
+
+    let imported = null
+    try {
+      imported = importTripJson(await file.text())
+    } catch {
+      setError({ field: 'import', message: '无法读取所选文件' })
+      return
+    }
+    if (!imported) {
+      setError({ field: 'import', message: '所选文件不是可加载的行程 JSON' })
+      return
+    }
+    if (!window.confirm('加载 JSON 会覆盖当前行程和未完成的手动重排，且无法恢复。确定继续？')) {
+      return
+    }
+    replaceTrip(imported)
+  }
+
   return (
     <div className="editor-form">
       <label className="field">
@@ -170,8 +208,24 @@ export function TripEditor() {
         </p>
       )}
       <p className="editor-info">
-        改变时区不会平移既有安排的时刻；缩小日期范围会删除范围外的整天数据。
+        改变时区不会平移既有安排的时刻；缩小日期范围会删除范围外的整天数据；加载会覆盖当前行程。
       </p>
+      <div className="data-transfer-actions">
+        <input
+          ref={importInputRef}
+          className="visually-hidden"
+          type="file"
+          accept=".json,application/json"
+          aria-label="选择行程 JSON 文件"
+          onChange={handleImport}
+        />
+        <button type="button" className="btn" onClick={handleExport}>
+          导出 JSON
+        </button>
+        <button type="button" className="btn" onClick={() => importInputRef.current?.click()}>
+          加载 JSON
+        </button>
+      </div>
       <div className="sheet-actions">
         <button type="button" className="btn btn-primary" onClick={handleSave}>
           保存

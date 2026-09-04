@@ -4,7 +4,7 @@ import type { Trip } from '../domain/types'
 import { validateTrip } from './validate'
 
 /**
- * localStorage 数据访问层（数据仅存浏览器，无导入导出）。
+ * localStorage 数据访问层（数据仅存浏览器，可通过行程设置手动导入导出）。
  * 应用不内置示例行程：无存档或数据无效时回退到空行程，
  * 用户从"行程设置"开始指定自己的旅行计划。
  */
