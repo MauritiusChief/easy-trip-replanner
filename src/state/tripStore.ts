@@ -6,7 +6,9 @@ import {
   withPlaceDeleted,
   withPlaceInserted,
   withPlaceSaved,
+  withTransportDeleted,
   withTransportDuration,
+  withTransportInserted,
   withTripSettingsSaved,
 } from '../domain/mutations'
 import {
@@ -68,6 +70,10 @@ export interface TripStore {
     legIndex: number,
     durationMinutes: number,
   ) => void
+  /** 为一个非首段且缺少交通的地点补建默认到达交通。 */
+  insertTransport: (dayKey: DateISO, legIndex: number) => void
+  /** 删除地点的到达交通。 */
+  deleteTransport: (dayKey: DateISO, legIndex: number) => void
   /** 保存备选库条目（新建或编辑，按 id upsert），保存后关闭编辑器。 */
   saveAlternative: (dayKey: DateISO, alternative: AlternativePlace) => void
   /** 删除备选库条目。 */
@@ -111,6 +117,16 @@ export const useTripStore = create<TripStore>()((set) => ({
   saveTransportEdit: (dayKey, legIndex, durationMinutes) =>
     set((state) => ({
       trip: withTransportDuration(state.trip, dayKey, legIndex, durationMinutes),
+      editor: null,
+    })),
+  insertTransport: (dayKey, legIndex) =>
+    set((state) => ({
+      trip: withTransportInserted(state.trip, dayKey, legIndex),
+      editor: null,
+    })),
+  deleteTransport: (dayKey, legIndex) =>
+    set((state) => ({
+      trip: withTransportDeleted(state.trip, dayKey, legIndex),
       editor: null,
     })),
   saveAlternative: (dayKey, alternative) =>

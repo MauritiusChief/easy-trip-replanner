@@ -109,7 +109,8 @@ function transportWithDuration(
 /**
  * 保存地点编辑：
  * - 更新地点字段（备选地点在日级库单独编辑，见 withAlternativeSaved）
- * - 同步坐标快照：自身交通的 to、下一段交通的 from 指向新坐标
+ * - 自身到达交通的结束时刻贴紧地点新开始时间，并同步其 to 坐标
+ * - 下一段交通的 from 快照指向新坐标
  *   （时长与基准速度不动，坐标变化导致的速度偏差由警告层提示）
  */
 export function withPlaceSaved(
@@ -125,7 +126,11 @@ export function withPlaceSaved(
           ...leg,
           place,
           transport: leg.transport
-            ? { ...leg.transport, to: place.location }
+            ? {
+                ...leg.transport,
+                start: place.start - leg.transport.durationMinutes * MS_PER_MINUTE,
+                to: place.location,
+              }
             : null,
         }
       }
@@ -149,6 +154,43 @@ export function withTransportDuration(
       i === legIndex
         ? { ...leg, transport: transportWithDuration(leg, durationMinutes) }
         : leg,
+    ),
+  )
+}
+
+/**
+ * 为已有地点补建到达交通：仅非首段且当前缺少交通时生效。
+ * 默认交通时长为 30 分钟，结束时刻贴紧目标地点开始时间。
+ */
+export function withTransportInserted(
+  trip: Trip,
+  dayKey: DateISO,
+  legIndex: number,
+): Trip {
+  return mapDay(trip, dayKey, (legs) => {
+    const target = legs[legIndex]
+    const previous = legIndex > 0 ? legs[legIndex - 1] : undefined
+    if (!target || !previous || target.transport) return legs
+    const durationMinutes = DEFAULT_INSERT_TRANSPORT_MINUTES
+    const transport: TransportSlot = {
+      start: target.place.start - durationMinutes * MS_PER_MINUTE,
+      durationMinutes,
+      from: previous.place.location,
+      to: target.place.location,
+      baseSpeedKmh: impliedSpeedKmh(
+        haversineKm(previous.place.location, target.place.location),
+        durationMinutes,
+      ),
+    }
+    return legs.map((leg, index) => (index === legIndex ? { ...leg, transport } : leg))
+  })
+}
+
+/** 删除一个地点的到达交通；地点及后续行程均保持不动。 */
+export function withTransportDeleted(trip: Trip, dayKey: DateISO, legIndex: number): Trip {
+  return mapDay(trip, dayKey, (legs) =>
+    legs.map((leg, index) =>
+      index === legIndex && leg.transport ? { ...leg, transport: null } : leg,
     ),
   )
 }

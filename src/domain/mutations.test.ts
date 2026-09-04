@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { withTripSettingsSaved } from './mutations'
-import { buildStandardReorderTrip } from '../test/standardReorderTrip'
+import { MS_PER_MINUTE } from './config'
+import {
+  withPlaceSaved,
+  withTransportDeleted,
+  withTransportInserted,
+  withTripSettingsSaved,
+} from './mutations'
+import { buildStandardReorderTrip, STANDARD_DAY_KEY } from '../test/standardReorderTrip'
 
 describe('withTripSettingsSaved：行程级设置', () => {
   it('覆盖名称、时区与每日窗口，范围外的天数不受影响', () => {
@@ -57,5 +63,62 @@ describe('withTripSettingsSaved：行程级设置', () => {
     })
     expect(saved.days.map((day) => day.date)).toEqual(['2030-06-01'])
     expect(saved.dayOverrides).toEqual({ '2030-06-01': { start: 7 * 60 } })
+  })
+})
+
+describe('地点与交通编辑', () => {
+  it('修改地点开始时间时，到达交通结束时刻贴紧新开始时间', () => {
+    const trip = buildStandardReorderTrip()
+    const original = trip.days[0].legs[3]
+    const nextStart = original.place.start + 35 * MS_PER_MINUTE
+    const place = { ...original.place, start: nextStart }
+
+    const saved = withPlaceSaved(trip, STANDARD_DAY_KEY, 3, place)
+    const transport = saved.days[0].legs[3].transport
+
+    expect(transport).not.toBeNull()
+    expect(transport?.start).toBe(nextStart - original.transport!.durationMinutes * MS_PER_MINUTE)
+    expect(transport?.durationMinutes).toBe(original.transport!.durationMinutes)
+    expect(transport?.to).toEqual(place.location)
+    expect(saved.days[0].legs[4].transport?.from).toEqual(place.location)
+  })
+
+  it('可为非首段缺失交通的地点补建默认 30 分钟交通', () => {
+    const source = buildStandardReorderTrip()
+    const legs = source.days[0].legs.map((leg, index) =>
+      index === 3 ? { ...leg, transport: null } : leg,
+    )
+    const trip = { ...source, days: [{ ...source.days[0], legs }] }
+
+    const saved = withTransportInserted(trip, STANDARD_DAY_KEY, 3)
+    const target = saved.days[0].legs[3]
+
+    expect(target.transport).toMatchObject({
+      start: target.place.start - 30 * MS_PER_MINUTE,
+      durationMinutes: 30,
+      from: saved.days[0].legs[2].place.location,
+      to: target.place.location,
+    })
+  })
+
+  it('不为首段或已有交通的地点重复创建交通', () => {
+    const trip = buildStandardReorderTrip()
+    const first = withTransportInserted(trip, STANDARD_DAY_KEY, 0)
+    const existing = withTransportInserted(trip, STANDARD_DAY_KEY, 3)
+
+    expect(first.days[0].legs[0].transport).toBeNull()
+    expect(existing.days[0].legs[3].transport).toBe(trip.days[0].legs[3].transport)
+  })
+
+  it('删除交通只移除目标地点的到达交通', () => {
+    const trip = buildStandardReorderTrip()
+    const previousTransport = trip.days[0].legs[2].transport
+    const followingTransport = trip.days[0].legs[4].transport
+
+    const saved = withTransportDeleted(trip, STANDARD_DAY_KEY, 3)
+
+    expect(saved.days[0].legs[3].transport).toBeNull()
+    expect(saved.days[0].legs[2].transport).toBe(previousTransport)
+    expect(saved.days[0].legs[4].transport).toBe(followingTransport)
   })
 })
