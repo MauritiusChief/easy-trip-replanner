@@ -91,7 +91,7 @@ function mapDayFull(
 
 /**
  * 用户手动修改交通时长后的交通 slot：
- * 时长取新值，基准速度按"当前距离 + 新时长"重算（需求 4.4）。
+ * 结束时刻贴紧目的地点开始时间，基准速度按"当前距离 + 新时长"重算（需求 4.4）。
  */
 function transportWithDuration(
   leg: Leg,
@@ -101,6 +101,7 @@ function transportWithDuration(
   const distanceKm = haversineKm(leg.transport.from, leg.place.location)
   return {
     ...leg.transport,
+    start: leg.place.start - durationMinutes * MS_PER_MINUTE,
     durationMinutes,
     baseSpeedKmh: impliedSpeedKmh(distanceKm, durationMinutes),
   }

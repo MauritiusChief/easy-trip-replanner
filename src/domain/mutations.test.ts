@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { MS_PER_MINUTE } from './config'
+import { haversineKm, impliedSpeedKmh } from './geo'
 import {
   withPlaceSaved,
   withTransportDeleted,
+  withTransportDuration,
   withTransportInserted,
   withTripSettingsSaved,
 } from './mutations'
@@ -99,6 +101,22 @@ describe('地点与交通编辑', () => {
       from: saved.days[0].legs[2].place.location,
       to: target.place.location,
     })
+  })
+
+  it('修改交通时长时，交通结束时刻仍贴紧地点开始时间', () => {
+    const trip = buildStandardReorderTrip()
+    const target = trip.days[0].legs[3]
+    const durationMinutes = 45
+
+    const saved = withTransportDuration(trip, STANDARD_DAY_KEY, 3, durationMinutes)
+    const transport = saved.days[0].legs[3].transport
+
+    expect(transport).not.toBeNull()
+    expect(transport?.durationMinutes).toBe(durationMinutes)
+    expect(transport?.start).toBe(target.place.start - durationMinutes * MS_PER_MINUTE)
+    expect(transport?.baseSpeedKmh).toBe(
+      impliedSpeedKmh(haversineKm(target.transport!.from, target.place.location), durationMinutes),
+    )
   })
 
   it('不为首段或已有交通的地点重复创建交通', () => {
